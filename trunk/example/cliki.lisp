@@ -194,9 +194,9 @@
                         (find-package :lisppaste)
                         channel
                         (> (length channel) 0)
-                        (char= (elt channel 0) #\#))
-               (funcall (intern "SAY-HELP" :lisppaste)
-                        channel)
+                        (char= (elt channel 0) #\#)
+                        (funcall (intern "SAY-HELP" :lisppaste)
+                                 channel))
                (return-from cliki-lookup nil))
 	    (or
 	     (if (string-equal first-pass "help") *cliki-bot-help*)
