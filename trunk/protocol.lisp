@@ -256,7 +256,7 @@ server, via the `connection'."
       (maphash #'(lambda (norm-name channel)
                    (declare (ignore norm-name))
                    (setf (gethash
-                          (setf (normalized-channel-name channel)
+                          (setf (normalized-name channel)
                                 (normalize-channel-name connection
                                                         (name channel)))
                           new-channels) channel)
