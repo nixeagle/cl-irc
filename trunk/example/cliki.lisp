@@ -16,6 +16,14 @@
 
 (defvar *aliases* nil)
 
+(defparameter *sd-file*
+  (merge-pathnames "sd.lisp-expr"
+                   (make-pathname
+                    :directory
+                    (pathname-directory
+                     (or *load-truename*
+                         *default-pathname-defaults*)))))
+
 (defun forget (term-or-alias)
   (setf *small-definitions* (remove term-or-alias *small-definitions* :test #'string-equal :key #'car))
   (setf *aliases* (remove term-or-alias *aliases* :test #'string-equal :key #'car))
@@ -32,7 +40,7 @@
 (defun read-small-definitions ()
   (setf *small-definitions* nil)
   (setf *aliases* nil)
-  (with-open-file (sd-file "sd.lisp-expr" :direction :input :if-does-not-exist nil)
+  (with-open-file (sd-file *sd-file* :direction :input :if-does-not-exist nil)
     (when sd-file
       (loop for defn = (read sd-file nil)
             if defn do (ecase (car defn)
@@ -41,7 +49,7 @@
             else return *small-definitions*))))
 
 (defun write-small-definitions ()
-  (with-open-file (sd-file "sd.lisp-expr" :direction :output :if-exists :supersede)
+  (with-open-file (sd-file *sd-file* :direction :output :if-exists :supersede)
     (mapc #'(lambda (db)
               (mapc #'(lambda (defn)
                         (prin1 (cons (car db) defn) sd-file)
@@ -50,7 +58,7 @@
                 (cons :alias *aliases*)))))
 
 (defun write-top-definition (&key (of *small-definitions*) (type :sd))
-  (with-open-file (sd-file "sd.lisp-expr" :direction :output :if-exists :append)
+  (with-open-file (sd-file *sd-file* :direction :output :if-exists :append)
     (prin1 (cons type (car of)) sd-file)
     (format sd-file "~%")))
 
@@ -66,9 +74,30 @@
 
 (defvar *followed-aliases* nil)
 
+(defvar *last-lookup* "")
+(defvar *last-lookup-source* "")
+(defvar *last-lookup-time* (get-universal-time))
+
 (defun alias-string-equal (orig candidate)
   (unless (member candidate *followed-aliases* :test #'string-equal)
     (string-equal orig candidate)))
+
+(defun should-do-lookup (text source)
+  (not (and (string-equal text *last-lookup*)
+            (string-equal source *last-lookup-source*)
+            (< (- (get-universal-time)
+                  *last-lookup-time*) 5))))
+
+(defun did-lookup (text source)
+  (setf *last-lookup* text)
+  (setf *last-lookup-source* source)
+  (setf *last-lookup-time* (get-universal-time)))
+
+(defmacro aif (test conseq &optional (else nil))
+  `(let ((it ,test))
+     (if it ,conseq
+       (symbol-macrolet ((it ,test))
+           ,else))))
 
 (defun small-definition-lookup (text)
   (cdr (assoc text *small-definitions* :test #'string-equal)))
@@ -121,6 +150,17 @@
                        :to (without-non-alphanumeric to)
                        :contents contents)
         *pending-memos*))
+
+(defun lookup-paste (number)
+  (and (find-package :lisppaste)
+       (let ((paste (funcall (intern "FIND-PASTE" :lisppaste) number)))
+         (and paste
+              (format nil "Paste number ~A: \"~A\" by ~A in ~A. ~A"
+                      number
+                      (funcall (intern "PASTE-TITLE" :lisppaste) paste)
+                      (funcall (intern "PASTE-USER" :lisppaste) paste)
+                      (funcall (intern "PASTE-CHANNEL" :lisppaste) paste)
+                      (funcall (intern "PASTE-DISPLAY-URL" :lisppaste) paste))))))
 
 (defun url-port (url)
   (assert (string-equal url "http://" :end1 7))
@@ -189,45 +229,46 @@
 
 (defun cliki-first-sentence (term)
   (let* ((cliki-url (format nil "http://www.cliki.net/~A"
-		     (encode-for-url term)))
-	 (url (concatenate 'string cliki-url "?source")))
+                            (encode-for-url term)))
+         (url (concatenate 'string cliki-url "?source")))
     (block cliki-return
       (handler-case
-	  (host-with-timeout 5
-	    (destructuring-bind (response headers stream)
-		(block got
-		  (loop
-		     (destructuring-bind (response headers stream) (url-connection url)
-		       (unless (member response '(301 302))	       
-			 (return-from got (list response headers stream)))
-		       (close stream)
-		       (setf url (cdr (assoc :location headers))))))
-	      (unwind-protect
-		   (if (not (eql response 200))
+          (host-with-timeout 5
+            (destructuring-bind (response headers stream)
+                (block got
+                  (loop
+                   (destructuring-bind (response headers stream) (url-connection url)
+                     (unless (member response '(301 302))	       
+                       (return-from got (list response headers stream)))
+                     (close stream)
+                     (setf url (cdr (assoc :location headers))))))
+              (unwind-protect
+                   (if (not (eql response 200))
                        nil
-		       ;;(format nil "The term ~A was not found in CLiki." term)
-		       (let ((first-line ""))
-			 (loop for i from 1 to 5 do ;; scan the first 5 lines
-			  (progn
-			    (multiple-value-bind (next-line missing-newline-p)
-				(read-line stream nil)
-			      (if next-line
-				  (setf first-line (concatenate 'string first-line next-line (string #\newline)))
-				  (return-from cliki-return (format nil "The end of the page was reached before a definition was found in ~A" cliki-url))))
-			    (setf first-line (regex-replace-all "\\r" first-line " "))
-			    (setf first-line (regex-replace-all "\\n" first-line " "))
-			    (setf first-line (regex-replace-all "_\\(([^)]*)\\)" first-line "\\1"))
-			    (setf first-line (regex-replace-all "\\*\\(([^)]*)\\)" first-line "\\1"))
-			    (setf first-line (regex-replace-all "<[^>]+>" first-line ""))
-			    (setf first-line (regex-replace-all "^(([^.]|\\.\\S)+)\\.\\s+.*$" first-line "\\1."))
-			    (setf first-line (regex-replace-all "(\\s)\\s+" first-line "\\1"))
-			    (setf first-line (regex-replace-all "^\\s*(.+\\S)\\s*$" first-line "\\1"))
-			    (when (scan "^([^.]|\\.\\S)+[.?!]$" first-line)
-				(setf first-line (concatenate 'string first-line " " cliki-url))
-				(return-from cliki-return first-line))))
-			 (format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
-		(if stream (close stream)))))
-	(condition (c &rest whatever) (return-from cliki-return (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " ")))))))
+                       ;;(format nil "The term ~A was not found in CLiki." term)
+                       (let ((first-line ""))
+                         (loop for i from 1 to 5 do ;; scan the first 5 lines
+                               (progn
+                                 (multiple-value-bind (next-line missing-newline-p)
+                                     (read-line stream nil)
+                                   (if next-line
+                                       (setf first-line (concatenate 'string first-line next-line (string #\newline)))
+                                       (return-from cliki-return (format nil "The end of the page was reached before a definition was found in ~A" cliki-url))))
+                                 (setf first-line (regex-replace-all "\\r" first-line " "))
+                                 (setf first-line (regex-replace-all "\\n" first-line " "))
+                                 (setf first-line (regex-replace-all "_\\(([^)]*)\\)" first-line "\\1"))
+                                 (setf first-line (regex-replace-all "\\*\\(([^)]*)\\)" first-line "\\1"))
+                                 (setf first-line (regex-replace-all "<[^>]+>" first-line ""))
+                                 (setf first-line (regex-replace-all "^(([^.]|\\.\\S)+)\\.\\s+.*$" first-line "\\1."))
+                                 (setf first-line (regex-replace-all "(\\s)\\s+" first-line "\\1"))
+                                 (setf first-line (regex-replace-all "^\\s*(.+\\S)\\s*$" first-line "\\1"))
+                                 (when (scan "^([^.]|\\.\\S)+[.?!]$" first-line)
+                                   (setf first-line (concatenate 'string first-line " " cliki-url))
+                                   (return-from cliki-return first-line))))
+                         (format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
+                (if stream (close stream)))))
+        (condition (c &rest whatever) (return-from cliki-return (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " ")))))
+    ))
 
 (defvar *cliki-connection*)
 (defvar *cliki-nickname*)
@@ -238,25 +279,60 @@
 (defun un-shut-up ()
   (setf (irc:client-stream *cliki-connection*) *trace-output*))
 
-(defmacro aif (test conseq &optional (else nil))
-  `(let ((it ,test))
-     (if it ,conseq
-       (symbol-macrolet ((it ,test))
-         ,else))))
+
 
 (defun make-cliki-attention-prefix (nick)
   (format nil "^~A[,:]\\s+" nick))
 
 (defvar *cliki-attention-prefix* "")
 
-(defparameter *cliki-bot-help* "The minion bot supplies small definitions and performs lookups on CLiki. To use it, try ``minion: term?''. To add a term for IRC, try saying ``minion: add \"term\" as: definition'' or ``minion: alias \"term\" as: term''; otherwise, edit the corresponding CLiki page.")
+(defparameter *help-text*
+  `(("lookups" . ,(lambda (nick)
+                          (format nil "To look up a term, say something like ``~A: term?''. I will either return a definition for the term or say that it could not be found. Lookups check the internal database first and then try to retrieve the first sentence of the page named like that on CLiki." nick)))
+    ("adding terms" .
+     ,(lambda (nick)
+              (format nil "To add a term, say something like ``~A: add \"term\" as: the definition''. I will remember the definition." nick)))
+    ("aliasing terms" .
+     ,(lambda (nick)
+              (format nil "To make a term an alias for another term, say something like ``~A: alias \"term\" as: some other term''. I will remember the alias." nick)))
+    ("forgetting" .
+     ,(lambda (nick)
+              (format nil "To make me forget something, say something like ``~A: forget term''. I'll forget what I know about that term or nickname." nick)))
+    ("memos" .
+     ,(lambda (nick)
+              (format nil "To send a memo, say something like ``~A: memo for nick: the memo''. I'll remember the memo for any nick which is the same as the given nick, +/- differences in punctuation, and any nick which is an alias for it, and give it to them when they next speak." nick)))
+    ("nicknames" .
+     ,(lambda (nick)
+              (format nil "If you have multiple nicknames and want to get your memos at any of them, say something like ``~A: nick1 is another nick for nick2''. If you decide to give up a nick, say ``~:*~A: forget nick2'' and I'll forget it." nick)))
+    ("goodies" .
+     ,(lambda (nick)
+              (format nil "If I'm connected to a lisppaste bot, try ``~A: paste 42'' or some other number." nick)))
+    ("eliza" .
+     ,(lambda (nick)
+              (declare (ignore nick))
+              (format nil "If you say multiple words to me which I don't recognize and it's not found as a lookup, you might get a sarcastic reply. Don't abuse this too much.")))))
+
+(defun cliki-bot-help (nick)
+  (format nil "There are multiple help modules. Try ``/msg ~A help kind'', where kind is one of: ~{\"~A\"~^, ~}."
+          nick
+          (mapcar #'car *help-text*)))
+
+(defun cliki-find-help (string)
+  (and (> (length string) 0)
+       (let ((resp-generator (cdr (assoc string *help-text* :test #'string-equal))))
+         (if resp-generator
+             (funcall resp-generator *cliki-nickname*)
+             (if (not (char-equal (elt string (1- (length string))) #\s))
+                 (cliki-find-help (concatenate 'string string
+                                               (string #\s))))))))
 
 (defun cliki-lookup (term-with-question &key sender channel)
-  (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2")))
+  (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2"))
+        (should-send-cant-find t))
     (setf first-pass (regex-replace-all "\\s\\s+" first-pass ""))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
     (let ((scanned (or (nth-value 1 (scan-to-strings "^add\\s+\"([^\"]+)\"\\s+as:*\\s+(.+)$" first-pass))
-                        (nth-value 1 (scan-to-strings "^add\\s+(.+)\\s+as:\\s+(.+)$" first-pass)))))
+                        (nth-value 1 (scan-to-strings "^add\\s+(.+)\\s+as:*\\s+(.+)$" first-pass)))))
       (if scanned
           (let ((term (elt scanned 0))
                 (defn (elt scanned 1)))
@@ -281,21 +357,35 @@
                            (funcall (intern "SAY-HELP" :lisppaste)
                                     channel))
                   (return-from cliki-lookup nil))
+                
                 (or
-                 (if (string-equal first-pass "help") *cliki-bot-help*)
-                 (let ((strings (nth-value 1 (scan-to-strings "^(?i)memo\\s+(for|to)\\s+(\\S+)\\s+:*\\s*(.+)$" first-pass))))
+                 (if (string-equal first-pass "help")
+                     (cliki-bot-help *cliki-nickname*))
+                 (let ((strings (nth-value 1 (scan-to-strings "^(?i)help\\s\"*([^\"]+)\"*$" first-pass))))
+                   (when strings
+                     (cliki-find-help (elt strings 0))))
+                 (let ((strings (nth-value 1 (scan-to-strings "^(?i)(memo|note)\\s+(for|to)\\s+(\\S+)\\s*[:,]+\\s+(.+)$" term-with-question))))
                    (when (and sender strings)
-                     (add-memo
-                      sender
-                      (if (member (elt strings 1) '("self" "myself" "me") :test #'string-equal)
-                          sender
-                          (elt strings 1))
-                      (elt strings 2))
-                     (format nil "Remembered. I'll tell ~A when he/she/it next speaks." (elt strings 1))))
+                     (if (string-equal (without-non-alphanumeric
+                                        (elt strings 2))
+                                       (without-non-alphanumeric
+                                        *cliki-nickname*))
+                         "Buzz off."
+                         (progn
+                           (add-memo
+                            sender
+                            (if (member (elt strings 2) '("self" "myself" "me") :test #'string-equal)
+                                sender
+                                (elt strings 2))
+                            (elt strings 3))
+                           (format nil "Remembered. I'll tell ~A when he/she/it next speaks." (elt strings 2))))))
                  (let ((to-forget (nth-value 1 (scan-to-strings "^forget\\s+([^.]+)\\.*$" first-pass))))
                    (when to-forget
                      (forget (elt to-forget 0))
                      (format nil "What's ~A? Never heard of it." (elt to-forget 0))))
+                 (let ((strs (nth-value 1 (scan-to-strings "^(?i)paste\\s+(\\d+)$" first-pass))))
+                   (and strs
+                        (lookup-paste (parse-integer (elt strs 0)))))
                  (if (scan "^(?i)hello(\\s|$)*" first-pass) "what's up?")
                  (if (scan "^(?i)hi(\\s|$)*" first-pass) "what's up?")
                  (if (scan "^(?i)yo(\\s|$)*" first-pass) "what's up?")
@@ -306,16 +396,22 @@
                  (if (scan "^(?i)version(\\s|!|\\?|\\.|$)*" first-pass)
                      (format nil "This is the minion bot, running on a ~A (~A) and running under ~A ~A." (machine-type) (machine-version) (lisp-implementation-type) (lisp-implementation-version)))
                  (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
-                 (aif (or (small-definition-lookup first-pass)
-                          (cliki-first-sentence first-pass)
-                          (alias-lookup first-pass)) (concatenate 'string first-pass ": " it))
+                 (if (should-do-lookup first-pass (or channel sender ""))
+                     (aif (or (small-definition-lookup first-pass)
+                              (cliki-first-sentence first-pass)
+                              (alias-lookup first-pass))
+                          (prog1
+                              (concatenate 'string first-pass ": " it)
+                            (did-lookup first-pass (or channel sender ""))))
+                     (setf should-send-cant-find nil))
                  (if (or
                       (scan "(!|\\.|\\s.+\\?|\\)|\\()\\s*$" term-with-question)
                       (scan "^\\s*\\S+\\s+\\S+.*$" term-with-question))
                      ;;(generate-text (+ 20 (random 6)))
                      (ignore-errors (eliza::eliza first-pass))
                      )
-                 (format nil "Sorry, I couldn't find anything in the database for ``~A''.~A" first-pass (if (scan " " first-pass) " Maybe you meant to end with punctuation?" ""))
+                 (when should-send-cant-find
+                   (format nil "Sorry, I couldn't find anything in the database for ``~A''.~A" first-pass (if (scan " " first-pass) " Maybe you meant to end with punctuation?" "")))
                  ))))))))
     
 (defun valid-cliki-message (message)
@@ -335,9 +431,10 @@
         (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
           (and response (privmsg *cliki-connection* respond-to response)))
       (if (string-equal (first (arguments message)) *cliki-nickname*)
-	  (privmsg *cliki-connection* respond-to (cliki-lookup (trailing-argument message) :sender (source message)))
-	(if (anybody-here (trailing-argument message))
-	    (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))))
+          (aif (cliki-lookup (trailing-argument message) :sender (source message))
+               (privmsg *cliki-connection* respond-to it))
+          (if (anybody-here (trailing-argument message))
+              (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))))
 
 (defvar *cliki-nickserv-password* "")
 
@@ -345,6 +442,11 @@
   (if (and (string-equal (source message) "NickServ")
 	   (scan "owned by someone else" (trailing-argument message)))
       (privmsg *cliki-connection* (source message) (format nil "IDENTIFY ~A" *cliki-nickserv-password*))))
+
+(defun rename-cliki (new-nick)
+  (setf *cliki-nickname* new-nick)
+  (nick *cliki-connection* new-nick)
+  (setf *cliki-attention-prefix* (make-cliki-attention-prefix new-nick)))
 
 (defun start-cliki-bot (nick server &rest channels)
   (read-small-definitions)

@@ -14,6 +14,12 @@
 
    (((?* ?x) ass (?* ?y))
     (|Can't| you be a bit more polite?))
+
+   (((?* ?x) me harder)
+    ("MORE" ?x))
+
+   ((more (?* ?x))
+    (?x me harder))
    
    (((?* ?x) you (?* ?y) written (?* ?z))
     (|I'm| written in Common Lisp))
@@ -230,6 +236,11 @@
     (well I |don't| want to think about ?y))
 
    ((is (?* ?x))
+    (no)
+    (yes)
+    (maybe))
+
+   ((does (?* ?x))
     (no)
     (yes)
     (maybe))
