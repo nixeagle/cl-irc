@@ -46,6 +46,11 @@
        (funcall (intern "SYMBOL-LOOKUP" :r5rs-lookup)
                 str)))
 
+(defun cocoa-lookup (str)
+  (and (find-package :cocoa-lookup)
+       (funcall (intern "SYMBOL-LOOKUP" :cocoa-lookup)
+                str)))
+
 (defun elisp-lookup (str)
   (and (find-package :elisp-lookup)
        (funcall (intern "SYMBOL-LOOKUP" :elisp-lookup)
@@ -59,6 +64,7 @@
 (defvar *spec-providers*
   '((clhs-lookup "clhs" "The Common Lisp HyperSpec")
     (r5rs-lookup "r5rs" "The Revised 5th Ed. Report on the Algorithmic Language Scheme")
+    (cocoa-lookup "cocoa" "Classes in the Cocoa Foundation and Application kits")
     (elisp-lookup "elisp" "GNU Emacs Lisp Reference Manual")
     (clim-lookup "clim" "Common Lisp Interface Manager II Specification")))
 
