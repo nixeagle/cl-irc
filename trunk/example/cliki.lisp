@@ -7,7 +7,7 @@
 ;;; cliki.lisp, and invoke (cliki::start-cliki-bot "desirednickname"
 ;;; "desiredserver" "#channel1" "#channel2" "#channel3" ...)
 
-(defpackage :cliki (:use :common-lisp :irc :cl-ppcre)
+(defpackage :cliki (:use :common-lisp :irc :cl-ppcre :split-sequence)
   (:export :start-cliki-bot :*cliki-nickserv-password*
 	   :*respond-to-general-hellos* :shut-up :un-shut-up))
 (in-package :cliki)
@@ -164,6 +164,65 @@
                      *pending-memos*))
     count))
 
+(defparameter *advice-file*
+  (merge-pathnames "advice"
+                   (make-pathname
+                    :directory
+                    (pathname-directory
+                     (or *load-truename*
+                         *default-pathname-defaults*)))))
+
+(defvar *advice-db* nil)
+
+(defun lookup-advice (num-str)
+  (let ((num (parse-integer num-str :junk-allowed t)))
+    (when (not *advice-db*)
+      (with-open-file (ad *advice-file* :direction :input)
+        (setf *advice-db* (read ad))))
+    (or (cddr (assoc num *advice-db*))
+        "You can't just make up advice numbers and expect a response.")))
+
+(defun fix-advice ()
+  (mapc #'(lambda (e)
+            (setf (cdr e)
+                  (cddr e))) *advice-db*))
+
+(defun random-advice ()
+  (let ((item (random-element *advice-db*)))
+    (format nil "#~A: ~A" (car item) (cdr item))))
+
+(defun search-advice (str)
+  (setf str (regex-replace-all "\\s+" str " "))
+  (setf str (regex-replace-all "[^a-zA-Z0-9 ]" str ""))
+  (let* ((terms (split-sequence #\space str))
+         (terms (mapcar #'(lambda (e)
+                            (regex-replace-all "^(.+)s$" e "\\1")) terms))
+         (terms (mapcar #'(lambda (e)
+                            (regex-replace-all "^(.+)ing$" e "\\1")) terms))
+         (terms (mapcar #'(lambda (e)
+                            (regex-replace-all "^(.+)ation$" e "\\1")) terms))
+         (terms (mapcar #'(lambda (e)
+                            (regex-replace-all "^(.+)ion$" e "\\1")) terms))
+        (max-score 0)
+        (max-score-items nil))
+    (mapc #'(lambda (e)
+              (let ((score
+                     (loop for i in terms
+                           if (search i (cdr e) :test #'char-equal)
+                           count it)))
+                (if (> score max-score)
+                    (progn
+                      (setf max-score score)
+                      (setf max-score-items (list e)))
+                    (if (and (not (zerop score))
+                             (eql score max-score))
+                        (push e max-score-items)))))
+          *advice-db*)
+    (if (zerop max-score)
+        "You can't expect automated advice for everything."
+        (let ((item (random-element max-score-items)))
+          (format nil "#~A: ~A" (car item) (cdr item))))))
+
 (defun lookup-paste (number)
   (and (find-package :lisppaste)
        (let ((paste (funcall (intern "FIND-PASTE" :lisppaste) number)))
@@ -303,6 +362,9 @@
 (defparameter *help-text*
   `(("lookups" . ,(lambda (nick)
                           (format nil "To look up a term, say something like ``~A: term?''. I will either return a definition for the term or say that it could not be found. Lookups check the internal database first and then try to retrieve the first sentence of the page named like that on CLiki." nick)))
+    ("helping others" .
+     ,(lambda (nick)
+              (format nil "I can tell another user about something if you address me like ``~A: show some-user something else''. I respond to a lot of different ways of asking for this, and you can have me show pretty much anything to another user." nick)))
     ("adding terms" .
      ,(lambda (nick)
               (format nil "To add a term, say something like ``~A: add \"term\" as: the definition''. I will remember the definition." nick)))
@@ -327,7 +389,10 @@
     ("eliza" .
      ,(lambda (nick)
               (declare (ignore nick))
-              (format nil "If you say multiple words to me which I don't recognize and it's not found as a lookup, you might get a sarcastic reply. Don't abuse this too much.")))))
+              (format nil "If you say multiple words to me which I don't recognize and it's not found as a lookup, you might get a sarcastic reply. Don't abuse this too much.")))
+    ("advice" .
+     ,(lambda (nick)
+              (format nil "Try saying something like ``~A: advice #11904'' to get some advice." nick)))))
 
 (defun cliki-bot-help (nick)
   (format nil "There are multiple help modules. Try ``/msg ~A help kind'', where kind is one of: ~{\"~A\"~^, ~}."
@@ -427,13 +492,25 @@
                   (or
                    (let ((strings
                           (or
-                           (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach)\\s+(\\S+)\\s+(about|on|in|to|through|)\\s*(.+)$" first-pass)))))
+                           (aif
+                            (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach)\\s+(\\S+)\\s+(about|on|in|to|through|for|)\\s*(.+)$" first-pass))
+                            (cons :forward it))
+                           (aif
+                            (nth-value 1 (scan-to-strings "^(?i)(look\\s+up\\s+|)\\s*(.+)\\s+(for|to|at)\\s+(\\S+)$" first-pass))
+                            (cons :backward it))
+                           )))
                      (if strings
-                         (let ((about (cliki-lookup (elt strings 3) :sender sender
+                         (let* ((term (case (car strings)
+                                        (:forward (elt (cdr strings) 3))
+                                        (:backward (elt (cdr strings) 1))))
+                                (person (case (car strings)
+                                        (:forward (elt (cdr strings) 1))
+                                        (:backward (elt (cdr strings) 3))))
+                                (about (cliki-lookup term :sender sender
                                                     :channel channel)))
                            (if about
                                (format nil "~A: ~A~A"
-                                       (elt strings 1)
+                                       person
                                        (if (scan "http:" about)
                                            (concatenate 'string
                                                         (random-element
@@ -511,6 +588,18 @@
                    (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
                    (if (scan "^(?i)chant$" first-pass)
                        (format nil "MORE ~A" *more*))
+                   (if (scan "^(?i)advice$" first-pass)
+                       (random-advice))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advise\\s+(\\S+)$" first-pass))))
+                     (and str
+                          (format nil "~A: ~A" (elt str 0)
+                                  (random-advice))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advice\\s+(on|about)\\s+(.+)$" first-pass))))
+                     (and str
+                          (search-advice (elt str 1))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advice\\W+(\\d+)$" first-pass))))
+                     (and str
+                          (lookup-advice (elt str 0))))
                    (if (should-do-lookup first-pass (or channel sender ""))
                        (aif (or (small-definition-lookup first-pass)
                                 (cliki-first-sentence first-pass)
