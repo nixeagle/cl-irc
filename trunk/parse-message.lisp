@@ -151,7 +151,9 @@ in the message."
           (ctcp (ctcp-message-type trailing-argument)))
       (when command
         (cond
-          ((irc-error-reply-p command)
+          (nil ;(irc-error-reply-p command)
+           ;; Disable for now, as it prevents adding hooks for some useful
+           ;; error types
            (progn
              (setf command (find-reply-name (parse-integer command)))
              (setf class 'irc-error-reply)))
