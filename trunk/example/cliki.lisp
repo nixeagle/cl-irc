@@ -3,11 +3,12 @@
 
 ;;;; cliki.lisp - CLiki as an infobot; only works on SBCL.
 
-;;; To use it, load the cl-irc and cl-ppcre systems, load
+;;; To use it, load the net-nittin-irc and cl-ppcre systems, load
 ;;; cliki.lisp, and invoke (cliki::start-cliki-bot "desirednickname"
 ;;; "desiredserver" "#channel1" "#channel2" "#channel3" ...)
 
-(defpackage :cliki (:use :common-lisp :irc :sb-bsd-sockets :cl-ppcre))
+(defpackage :cliki (:use :common-lisp :irc :sb-bsd-sockets :cl-ppcre)
+  (:export :start-cliki-bot))
 (in-package :cliki)
 
 (defvar *small-definitions* nil)
@@ -98,7 +99,8 @@
 		       (setf url (cdr (assoc :location headers))))))
 	      (unwind-protect
 		   (if (not (eql response 200))
-		       (format nil "The term ~A was not found in CLiki." term)
+                       nil
+		       ;;(format nil "The term ~A was not found in CLiki." term)
 		       (let ((first-line ""))
 			 (loop for i from 1 to 5 do ;; scan the first 5 lines
 			  (progn
@@ -131,7 +133,7 @@
        (symbol-macrolet ((it ,test))
          ,else))))
 
-(defparameter *cliki-attention-prefix* "minion: ")
+(defparameter *cliki-attention-prefix* "")
 
 (defparameter *cliki-bot-help* "The minion bot supplies small definitions and performs lookups on CLiki. To use it, try ``minion: term?''. To add a term for IRC, try saying ``minion: add \"term\" as: definition'' or ``minion: alias \"term\" as: term''; otherwise, edit the corresponding CLiki page.")
 
@@ -149,16 +151,32 @@
 		  (defn (regex-replace "^alias \"[^\"]+\" as: (.+)$" first-pass "\\1")))
 	      (add-small-definition term (list defn))
 	      "OK, done.")
+	  (progn
+	    (setf first-pass (regex-replace-all "(:|/|\\\\|\\#)" first-pass ""))
 	    (or
 	     (if (string-equal first-pass "help") *cliki-bot-help*)
-	     (if (scan "^(?i)do my bidding!*$" first-pass) "Yes, my master.")
-	     (concatenate 'string first-pass ": "
-			  (or (let ((term (cdr (assoc first-pass *small-definitions* :test #'string-equal))))
-				(if term (if (stringp term) term (cliki-lookup (car term)))))
-			      (cliki-first-sentence first-pass))))))))
+	     (if (scan "^(?i)hello(\\s|$)" first-pass) "what's up?")
+	     (if (scan "^(?i)hi(\\s|$)" first-pass) "what's up?")
+	     (if (scan "^(?i)yo(\\s|$)" first-pass) "what's up?")
+	     (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
+             (aif (or (let ((term (cdr (assoc first-pass *small-definitions* :test #'string-equal))))
+                        (if term (if (stringp term) term (cliki-lookup (car term)))))
+                      (cliki-first-sentence first-pass)) (concatenate 'string first-pass ": " it))
+             (if (scan "(!|\\.|\\s.+\\?|\\)|\\()\\s*$" term-with-question)
+		 ;;(generate-text (+ 20 (random 6)))
+		 (ignore-errors (eliza::eliza first-pass))
+	       )
+	     (format nil "Sorry, I couldn't find anything in the database for ``~A''.~A" first-pass (if (scan " " first-pass) " Maybe you meant to end with punctuation?" ""))
+                  ))))))
 
 (defun valid-cliki-message (message)
   (eql (search *cliki-attention-prefix* (trailing-argument message) :test #'char-equal) 0))
+
+(defparameter *respond-to-hello* nil)
+
+(defun anybody-here (string)
+  (or (scan "(?i)(anybody|aynbody|any body|anyone|aynone|any one|ne1|any1|n e 1|ne 1) (here|awake|there|home|know).*\\?*" string)
+      (scan "^(?i)\\s*(hello|hi|yo)\\s*(channel|room|people|ppl|all|peeps|)\\s*$" string)))
 
 (defun msg-hook (message)
   (if (string-equal (first (arguments message)) *cliki-nickname*)
@@ -166,7 +184,9 @@
           (privmsg *cliki-connection* (source message) (cliki-lookup (subseq (trailing-argument message) (length *cliki-attention-prefix*))))
         (privmsg *cliki-connection* (source message) (cliki-lookup (trailing-argument message))))
     (if (valid-cliki-message message)
-        (privmsg *cliki-connection* (first (arguments message)) (cliki-lookup (subseq (trailing-argument message) (length *cliki-attention-prefix*)))))))
+        (privmsg *cliki-connection* (first (arguments message)) (cliki-lookup (subseq (trailing-argument message) (length *cliki-attention-prefix*))))
+      (if (and *respond-to-hello* (anybody-here (trailing-argument message)))
+	  (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message)))))))
 
 (defvar *cliki-nickserv-password* "")
 
@@ -178,6 +198,7 @@
 (defun start-cliki-bot (nick server &rest channels)
   (read-small-definitions)
   (setf *cliki-nickname* nick)
+  (setf *cliki-attention-prefix* (format nil "~A: " nick))
   (setf *cliki-connection* (connect :nickname *cliki-nickname* :server server))
   (mapcar #'(lambda (channel) (join *cliki-connection* channel)) channels)
   (add-hook *cliki-connection* 'irc::irc-privmsg-message 'msg-hook)
