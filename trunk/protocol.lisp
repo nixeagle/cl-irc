@@ -520,14 +520,23 @@ may be already be on."
 
 (defclass irc-error-reply (irc-message) ())
 
+(defun intern-message-symbol (prefix name)
+  "Intern based on symbol-name to support case-sensitive mlisp"
+  (intern
+   (concatenate 'string
+		(symbol-name prefix)
+		"-"
+		(symbol-name name)
+		"-"
+		(symbol-name '#:message))))
+  
 (defmacro define-irc-message (command)
-  (let ((*print-case* :upcase))
-    (let ((name (intern (format nil "IRC-~A-MESSAGE" command))))
-      `(progn
-         (defmethod find-irc-message-class ((type (eql ,command)))
-           (find-class ',name))
-         (export ',name)
-         (defclass ,name (irc-message) ())))))
+  (let ((name (intern-message-symbol :irc command)))
+    `(progn
+      (defmethod find-irc-message-class ((type (eql ,command)))
+	(find-class ',name))
+      (export ',name)
+      (defclass ,name (irc-message) ()))))
 
 (defun create-irc-message-classes (class-list)
   (dolist (class class-list)
@@ -570,13 +579,12 @@ may be already be on."
 (defclass standard-ctcp-message (ctcp-mixin message) ())
 
 (defmacro define-ctcp-message (ctcp-command)
-  (let ((*print-case* :upcase))
-    (let ((name (intern (format nil "CTCP-~A-MESSAGE" ctcp-command))))
-      `(progn
-         (defmethod find-ctcp-message-class ((type (eql ,ctcp-command)))
-           (find-class ',name))
-         (export ',name)
-         (defclass ,name (ctcp-mixin irc-message) ())))))
+  (let ((name (intern-message-symbol :ctcp ctcp-command)))
+    `(progn
+      (defmethod find-ctcp-message-class ((type (eql ,ctcp-command)))
+	(find-class ',name))
+      (export ',name)
+      (defclass ,name (ctcp-mixin irc-message) ()))))
 
 (defun create-ctcp-message-classes (class-list)
   (dolist (class class-list)
