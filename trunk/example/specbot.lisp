@@ -37,30 +37,30 @@
          ,else))))
 
 (defun clhs-lookup (str)
-  (aif (and (find-package :clhs-lookup)
-            (funcall (intern "SPEC-LOOKUP" :clhs-lookup)
-                     str))
-       it
-       (format nil "Nothing was found for: ~A" str)))
+  (and (find-package :clhs-lookup)
+       (funcall (intern "SPEC-LOOKUP" :clhs-lookup)
+                str)))
 
 (defun r5rs-lookup (str)
-  (aif (and (find-package :r5rs-lookup)
-            (funcall (intern "SYMBOL-LOOKUP" :r5rs-lookup)
-                     str))
-       it
-       (format nil "Nothing was found for: ~A" str)))
+  (and (find-package :r5rs-lookup)
+       (funcall (intern "SYMBOL-LOOKUP" :r5rs-lookup)
+                str)))
 
 (defun elisp-lookup (str)
-  (aif (and (find-package :elisp-lookup)
-            (funcall (intern "SYMBOL-LOOKUP" :elisp-lookup)
-                     str))
-       it
-       (format nil "Nothing was found for: ~A" str)))
+  (and (find-package :elisp-lookup)
+       (funcall (intern "SYMBOL-LOOKUP" :elisp-lookup)
+                str)))
+
+(defun clim-lookup (str)
+  (and (find-package :clim-lookup)
+       (funcall (intern "TERM-LOOKUP" :clim-lookup)
+                str)))
 
 (defvar *spec-providers*
   '((clhs-lookup "clhs" "The Common Lisp HyperSpec")
     (r5rs-lookup "r5rs" "The Revised 5th Ed. Report on the Algorithmic Language Scheme")
-    (elisp-lookup "elisp" "GNU Emacs Lisp Reference Manual")))
+    (elisp-lookup "elisp" "GNU Emacs Lisp Reference Manual")
+    (clim-lookup "clim" "Common Lisp Interface Manager II Specification")))
 
 (defvar *alists* nil)
 
@@ -73,9 +73,7 @@
 
 (defun simple-alist-lookup (designator string)
   (let ((alist (cdr (assoc designator *alists*))))
-    (aif (assoc string alist :test #'equalp)
-         (cdr it)
-         (format nil "Nothing was found for: ~A" string))))
+    (cdr (assoc string alist :test #'equalp))))
 
 (defun valid-message (string prefix &key space-allowed)
   (if (eql (search prefix string :test #'char-equal) 0)
@@ -89,7 +87,7 @@
                        (format nil "~A: " address)
                        (format nil "~A:" address)
                        (format nil "~A, " address))
-        do (aif (valid-message string i :space-allowed (not final))
+        do (aif (valid-message string i :space-allowed t)
                 (return-from strip-address (subseq string it))))
   (and (not final) string))
 
@@ -115,7 +113,12 @@
                                                       (funcall fun first-arg lookup))))
               do
               (aif (strip-address to-lookup :address (second type) :final t)
-                   (privmsg *connection* destination (funcall actual-fun it)))))))
+                   (let ((looked-up (funcall actual-fun it)))
+                     (if (and (< 0 (count #\space it) 3)
+                              (not looked-up))
+                         (setf looked-up (format nil "Sorry, I couldn't find anything for ~A."  it)))
+                     (and looked-up
+                          (privmsg *connection* destination looked-up))))))))
   
 (defun start-specbot (nick server &rest channels)
   (add-simple-alist-lookup "754.lisp-expr" 'ieee754 "ieee754" "Section numbers of IEEE 754")
