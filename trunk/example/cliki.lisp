@@ -545,7 +545,7 @@
                              channel
                              (> (length channel) 0)
                              (char= (elt channel 0) #\#)
-                             (funcall (intern "SAY-HELP" :lisppaste)
+                             (funcall (intern "IRC-SAY-HELP" :lisppaste)
                                       channel))
                     (return-from cliki-lookup nil))
                   (or

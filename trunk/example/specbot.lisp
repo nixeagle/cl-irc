@@ -137,9 +137,18 @@
                      (or *load-truename*
                          *default-pathname-defaults*)))))
 
+(defparameter *sus-file*
+  (merge-pathnames "sus.lisp-expr"
+                   (make-pathname
+                    :directory
+                    (pathname-directory
+                     (or *load-truename*
+                         *default-pathname-defaults*)))))
+
 (defun start-specbot (nick server &rest channels)
   (add-simple-alist-lookup *754-file* 'ieee754 "ieee754" "Section numbers of IEEE 754")
   (add-simple-alist-lookup *ppc-file* 'ppc "ppc" "PowerPC assembly mnemonics")
+  (add-simple-alist-lookup *sus-file* 'sus "posix" "Single UNIX Specification")
   (setf *nickname* nick)
   (setf *connection* (connect :nickname *nickname* :server server))
   (mapcar #'(lambda (channel) (join *connection* channel)) channels)
