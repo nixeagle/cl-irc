@@ -191,15 +191,17 @@
   (setf str (regex-replace-all "[^a-zA-Z0-9 ]" str ""))
   (let* ((terms (split-sequence #\space str))
          (terms (mapcar #'(lambda (e)
+                            (loop for r = (regex-replace-all "^(.+)(ness|ing|ation|ion|ly)$" e "\\1")
+                                  if (equal e r) return r
+                                  do (setf e r)
+                                  )) terms))
+         (terms (mapcar #'(lambda (e)
+                            (regex-replace-all "^(.+)([a-zA-Z])\\2+$" e "\\1\\2")) terms))
+         (terms (mapcar #'(lambda (e)
                             (regex-replace-all "^(.+)s$" e "\\1")) terms))
-         (terms (mapcar #'(lambda (e)
-                            (regex-replace-all "^(.+)ing$" e "\\1")) terms))
-         (terms (mapcar #'(lambda (e)
-                            (regex-replace-all "^(.+)ation$" e "\\1")) terms))
-         (terms (mapcar #'(lambda (e)
-                            (regex-replace-all "^(.+)ion$" e "\\1")) terms))
-        (max-score 0)
-        (max-score-items nil))
+         (max-score 0)
+         (max-score-items nil))
+    ;;(format t "terms is ~S~%" terms)
     (mapc #'(lambda (e)
               (let ((score
                      (loop for i in terms
@@ -589,6 +591,11 @@
                      (and str
                           (format nil "~A: ~A" (elt str 0)
                                   (random-advice))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(\\S+)\\s+(on|about)\\s+(.+)$" first-pass))))
+                     (and str
+                          (format nil "~A: ~A"
+                                  (elt str 0)
+                                  (search-advice (elt str 2)))))
                    (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(on|about)\\s+(.+)$" first-pass))))
                      (and str
                           (search-advice (elt str 1))))
@@ -633,10 +640,10 @@
   (scan-for-more (trailing-argument message))
   (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
     (if (valid-cliki-message message)
-        (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
+        (let ((response (ignore-errors (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message))))))
           (and response (privmsg *cliki-connection* respond-to response)))
       (if (string-equal (first (arguments message)) *cliki-nickname*)
-          (aif (cliki-lookup (trailing-argument message) :sender (source message))
+          (aif (ignore-errors (cliki-lookup (trailing-argument message) :sender (source message)))
                (privmsg *cliki-connection* respond-to it))
           (if (anybody-here (trailing-argument message))
               (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))
