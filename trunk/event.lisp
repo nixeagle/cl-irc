@@ -20,6 +20,47 @@ message."))
 of the IRC message to keep the connection, channel and user
 objects in sync."))
 
+(defmacro generate-maskmode-hooks (listmsg-class endmsg-class
+                                                 tmp-symbol mode-symbol)
+  `(progn
+     (defmethod default-hook ((message ,listmsg-class))
+       (destructuring-bind
+           (target channel-name mask set-by time-set)
+           (arguments message)
+         (declare (ignore target set-by time-set))
+         ;; note: the structure currently does not allow for logging
+         ;; set-by and time-set: the MODE message handling currently
+         ;; does not allow that.
+         (let ((channel (find-channel (connection message) channel-name)))
+           (when channel
+             (unless (has-mode-p channel ',tmp-symbol)
+               ;; start with a new list, replacing the old value later
+               (add-mode channel ',tmp-symbol
+                         (make-instance 'list-value-mode
+                                        :value-type :non-user)))
+             ;; use package-local symbol to prevent conflicts
+             (set-mode channel ',tmp-symbol mask)))))
+
+     (defmethod default-hook ((message ,endmsg-class))
+       (let ((channel (find-channel (connection message)
+                                    (car (arguments message)))))
+         (when channel
+           (let ((mode (has-mode-p channel ',tmp-symbol)))
+             (when mode
+               ;; replace list
+               (add-mode channel ',mode-symbol mode)
+               (remove-mode channel ',tmp-symbol))))))))
+
+(generate-maskmode-hooks irc-rpl_banlist-message
+                         irc-rpl_endofbanlist-message
+                         banlist-in-progress :ban)
+(generate-maskmode-hooks irc-rpl_exceptlist-message
+                         irc-rpl_endofexceptlist-message
+                         exceptlist-in-progress :except)
+(generate-maskmode-hooks irc-rpl_invitelist-message
+                         irc-rpl_endofinvitelist-message
+                         invitelist-in-progress :invite)
+
 (defmethod default-hook ((message irc-rpl_isupport-message))
   (let* ((capabilities (cdr (arguments message)))
          (connection (connection message))
@@ -72,13 +113,17 @@ objects in sync."))
 (defmethod default-hook ((message irc-rpl_namreply-message))
   (let* ((connection (connection message))
          (channel (find-channel connection (car (last (arguments message))))))
+    (unless (has-mode-p channel 'namreply-in-progress)
+      (add-mode channel 'namreply-in-progress
+                (make-instance 'list-value-mode :value-type :user)))
     (dolist (nickname (tokenize-string (trailing-argument message)))
       (let ((user (find-or-make-user connection
                                      (canonicalize-nickname connection
                                                             nickname))))
         (unless (equal user (user connection))
           (add-user connection user)
-          (add-user channel user))
+          (add-user channel user)
+          (set-mode channel 'namreply-in-progress user))
         (let* ((mode-char (getf (nick-prefixes connection)
                                 (elt nickname 0)))
                (mode-name (when mode-char
@@ -91,6 +136,19 @@ objects in sync."))
                                         (make-mode connection
                                                    channel mode-name))
                               user))))))))
+
+(defmethod default-hook ((message irc-rpl_endofnames-message))
+  (let* ((channel (find-channel (connection message)
+                                (second (arguments message))))
+         (mode (get-mode channel 'namreply-in-progress))
+         (channel-users))
+    (remove-mode channel 'namreply-in-progress)
+    (maphash #'(lambda (nick user-obj)
+                 (declare (ignore nick))
+                 (pushnew user-obj channel-users)) (users channel))
+    (dolist (user (remove-if #'(lambda (x)
+                                 (member x mode)) channel-users))
+      (remove-user channel user))))
 
 (defmethod default-hook ((message irc-ping-message))
   (pong (connection message) (trailing-argument message)))

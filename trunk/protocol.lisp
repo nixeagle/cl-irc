@@ -202,9 +202,16 @@ this stream.")
 (defmethod add-default-hooks ((connection connection))
   (dolist (message '(irc-rpl_isupport-message
                      irc-rpl_whoisuser-message
+                     irc-rpl_banlist-message
+                     irc-rpl_endofbanlist-message
+                     irc-rpl_exceptlist-message
+                     irc-rpl_endofexceptlist-message
+                     irc-rpl_invitelist-message
+                     irc-rpl_endofinvitelist-message
                      irc-rpl_list-message
                      irc-rpl_topic-message
                      irc-rpl_namreply-message
+                     irc-rpl_endofnames-message
                      irc-ping-message
                      irc-join-message
                      irc-topic-message
