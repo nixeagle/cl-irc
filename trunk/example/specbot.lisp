@@ -57,10 +57,25 @@
        it
        (format nil "Nothing was found for: ~A" str)))
 
-(defparameter *spec-providers*
+(defvar *spec-providers*
   '((clhs-lookup "clhs" "The Common Lisp HyperSpec")
     (r5rs-lookup "r5rs" "The Revised 5th Ed. Report on the Algorithmic Language Scheme")
     (elisp-lookup "elisp" "GNU Emacs Lisp Reference Manual")))
+
+(defvar *alists* nil)
+
+(defun add-simple-alist-lookup (file designator prefix description)
+  (let ((alist (with-open-file (s file :direction :input) (read s))))
+    (push (cons designator alist) *alists*)
+    (setf *spec-providers*
+          (nconc *spec-providers*
+                 (list `((simple-alist-lookup ,designator) ,prefix ,description))))))
+
+(defun simple-alist-lookup (designator string)
+  (let ((alist (cdr (assoc designator *alists*))))
+    (aif (assoc string alist :test #'equalp)
+         (cdr it)
+         (format nil "Nothing was found for: ~A" string))))
 
 (defun valid-message (string prefix &key space-allowed)
   (if (eql (search prefix string :test #'char-equal) 0)
@@ -94,11 +109,16 @@
                    (format nil "The available databases are: ~{~{~*~S, ~A~}~^; ~}"
                            *spec-providers*)))
         (loop for type in *spec-providers*
+              for actual-fun = (if (typep (first type) 'symbol)
+                                   (first type)
+                                   (lambda (lookup) (destructuring-bind (fun first-arg) (first type)
+                                                      (funcall fun first-arg lookup))))
               do
               (aif (strip-address to-lookup :address (second type) :final t)
-                   (privmsg *connection* destination (funcall (first type) it)))))))
+                   (privmsg *connection* destination (funcall actual-fun it)))))))
   
 (defun start-specbot (nick server &rest channels)
+  (add-simple-alist-lookup "754.lisp-expr" 'ieee754 "ieee754" "Section numbers of IEEE 754")
   (setf *nickname* nick)
   (setf *connection* (connect :nickname *nickname* :server server))
   (mapcar #'(lambda (channel) (join *connection* channel)) channels)

@@ -144,7 +144,7 @@
 				(return-from cliki-return first-line))))
 			 (format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
 		(if stream (close stream)))))
-	(condition (c &rest whatever) (return-from cliki-return (format nil "An error was encountered in lookup.")))))))
+	(condition (c &rest whatever) (return-from cliki-return (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " ")))))))
 
 (defvar *cliki-connection*)
 (defvar *cliki-nickname*)
@@ -165,7 +165,7 @@
 (defun make-cliki-attention-prefix (nick)
   (format nil "^~A[,:]\\s+" nick))
 
-(defparameter *cliki-attention-prefix* "")
+(defvar *cliki-attention-prefix* "")
 
 (defparameter *cliki-bot-help* "The minion bot supplies small definitions and performs lookups on CLiki. To use it, try ``minion: term?''. To add a term for IRC, try saying ``minion: add \"term\" as: definition'' or ``minion: alias \"term\" as: term''; otherwise, edit the corresponding CLiki page.")
 
