@@ -3,7 +3,7 @@
 
 ;;;; See the LICENSE file for licensing information.
 
-(in-package :net-nittin-irc-test)
+(in-package :cl-irc-test)
 
 (defvar *nick1* "kire")
 (defvar *nick2* "k|[]re")

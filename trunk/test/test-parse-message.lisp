@@ -3,7 +3,7 @@
 
 ;;;; See the LICENSE file for licensing information.
 
-(in-package :net-nittin-irc-test)
+(in-package :cl-irc-test)
 
 (defvar *msg1* (format nil ":kire!~~eenge@216.248.178.227 PRIVMSG cl-irc :heyhey!~A" #\Return))
 (defvar *msg2* (format nil ":tolkien.freenode.net 372 cl-irc :-~A" #\Return))
