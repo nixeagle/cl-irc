@@ -237,22 +237,26 @@ registered."
 (defmethod time- ((connection connection) &optional (target ""))
   (send-irc-message connection :time nil target))
 
-#+sbcl
 (defun connect-to-server-socket (host port)
+  #+sbcl
   (let ((s (make-instance 'sb-bsd-sockets:inet-socket
                           :type :stream
                           :protocol :tcp)))
     (sb-bsd-sockets:socket-connect s (car (sb-bsd-sockets:host-ent-addresses
                                            (sb-bsd-sockets:get-host-by-name host))) port)
-    s))
+    s)
+  #+openmcl
+  (ccl:make-socket :remote-host host :remote-port port))
 
-#+sbcl
 (defun socket-stream (socket)
+  #+sbcl
   (sb-bsd-sockets:socket-make-stream socket
                                      :element-type 'character
                                      :input t
                                      :output t
-                                     :buffering :none))
+                                     :buffering :none)
+  #+openmcl
+  socket)
 
 (defun connect (&key (nickname *default-nickname*)
                      (username nil)
@@ -262,15 +266,15 @@ registered."
                      (port *default-irc-server-port*)
                      (logging-stream t))
   "Connect to server and return a connection object."
-  (let* ((socket #+sbcl (connect-to-server-socket server port)
-                 #-sbcl nil)
+  (let* ((socket #+(or sbcl openmcl) (connect-to-server-socket server port))
          (stream #+lispworks (comm:open-tcp-stream server port :errorp t)
                  #+cmu       (sys:make-fd-stream (ext:connect-to-inet-socket server port)
                                                  :input t
                                                  :output t
                                                  :element-type 'character)
                  #+allegro (socket:make-socket :remote-host server :remote-port port)
-                 #+sbcl (socket-stream socket))
+                 #+sbcl (socket-stream socket)
+                 #+openmcl socket)
          (user (make-user :nickname nickname
                           :username username
                           :realname realname))

@@ -167,15 +167,17 @@ in the message."
       (when ctcp
         (setf class (find-ctcp-message-class ctcp)))
       (let ((instance (make-instance class
-                                     :source source
-                                     :user user
-                                     :host host
-                                     :command command
+                                     :source (or source "")
+                                     :user (or user "")
+                                     :host (or host "")
+                                     :command (if command
+                                                  (string command)
+                                                  "")
                                      :arguments arguments
                                      :connection nil
-                                     :trailing-argument trailing-argument
+                                     :trailing-argument (or trailing-argument "")
                                      :received-time (get-universal-time)
-                                     :raw-message-string string)))
+                                     :raw-message-string (or string ""))))
         (when ctcp
           (setf (ctcp-command instance) ctcp))
         instance))))

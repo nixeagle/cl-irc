@@ -142,14 +142,15 @@ input."
   #+allegro (mp:process-run-function name function)
   #+cmu (mp:make-process function :name name)
   #+lispworks (mp:process-run-function name nil function)
-  #+sb-thread (sb-thread:make-thread function))
+  #+sb-thread (sb-thread:make-thread function)
+  #+openmcl (ccl:process-run-function name function))
 
 (defmethod start-background-message-handler ((connection connection))
   "Read messages from the `connection', parse them and dispatch
 irc-message-event on them. Returns background process ID if available."
   (flet ((do-loop () (read-message-loop connection)))
     (let ((name (format nil "irc-hander-~D" (incf *process-count*))))
-      #+(or allegro cmu lispworks sb-thread)
+      #+(or allegro cmu lispworks sb-thread openmcl)
       (start-process #'do-loop name)
       #+(and sbcl (not sb-thread))
       (sb-sys:add-fd-handler (sb-bsd-sockets:socket-file-descriptor
@@ -163,7 +164,8 @@ irc-message-event on them. Returns background process ID if available."
     #+cmu (mp:destroy-process process)
     #+allegro (mp:process-kill process)
     #+sb-thread (sb-thread:destroy-thread process)
-    #+lispworks (mp:process-kill process))
+    #+lispworks (mp:process-kill process)
+    #+openmcl (ccl:process-kill process))
 
 (defmethod read-message-loop ((connection connection))
   (loop while (read-message connection)))
@@ -251,7 +253,14 @@ between the two users.")))
                    :stream (sb-bsd-sockets:socket-make-stream socket :input t :output t :buffering :none)
                    :socket socket
                    :output-stream t))
-  #-sbcl
+  #+openmcl
+  (let ((socket-stream (ccl:make-socket :remote-host remote-address
+                                        :remote-port remote-port)))
+    (make-instance 'dcc-connection
+                   :user user
+                   :stream socket-stream
+                   :output-stream output-stream))
+  #-(or openmcl sbcl)
   (warn "make-dcc-connection not supported for this implementation."))
 
 (defgeneric dcc-close (connection))
@@ -596,6 +605,7 @@ may be already be on."
 			      :pong :invite))
 
 (defmethod find-irc-message-class (type)
+  (declare (ignore type))
   (find-class 'irc-message))
 
 (defmethod client-log ((connection connection) (message irc-message) &optional (prefix ""))
@@ -645,6 +655,7 @@ may be already be on."
                                :dcc-send-request))
 
 (defmethod find-ctcp-message-class (type)
+  (declare (ignore type))
   (find-class 'standard-ctcp-message))
 
 (defmethod client-log ((connection connection) (message ctcp-mixin) &optional (prefix ""))
