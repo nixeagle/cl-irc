@@ -29,10 +29,6 @@
     :initarg :server-name
     :accessor server-name
     :initform "Unknown server")
-   (server-socket
-    :initarg :server-socket
-    :accessor server-socket
-    :documentation "Socket used to talk to the IRC server.")
    (server-stream
     :initarg :server-stream
     :accessor server-stream
@@ -79,14 +75,12 @@ this stream.")
 
 (defun make-connection (&key (user nil)
                              (server-name "")
-                             (server-socket nil)
                              (server-stream nil)
                              (client-stream t)
                              (hooks nil))
   (let ((connection (make-instance 'connection
                                    :user user
                                    :server-name server-name
-                                   :server-socket server-socket
                                    :server-stream server-stream
                                    :client-stream client-stream)))
     (dolist (hook hooks)
@@ -154,8 +148,8 @@ irc-message-event on them. Returns background process ID if available."
       #+(or allegro cmu lispworks sb-thread openmcl armedbear)
       (start-process #'do-loop name)
       #+(and sbcl (not sb-thread))
-      (sb-sys:add-fd-handler (sb-bsd-sockets:socket-file-descriptor
-			      (server-socket connection))
+      (sb-sys:add-fd-handler (sb-sys:fd-stream-fd
+			      (server-stream connection))
 			     :input (lambda (fd)
 				      (declare (ignore fd))
 				      (read-message connection))))))
