@@ -77,8 +77,8 @@ user class.")))
 (defmethod has-value-p ((mode single-value-mode) value
                         &key (key #'identity) (test #'equal))
   (funcall test
-           (funcall key (value mode))
-           (funcall key value)))
+           value
+           (funcall key (value mode))))
 
 
 ;; mode class for holding lists of values
