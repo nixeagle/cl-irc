@@ -594,7 +594,7 @@
                      (and str
                           (format nil "~A: ~A" (elt str 0)
                                   (random-advice))))
-                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advice\\s+(on|about)\\s+(.+)$" first-pass))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(on|about)\\s+(.+)$" first-pass))))
                      (and str
                           (search-advice (elt str 1))))
                    (let ((str (nth-value 1 (scan-to-strings "^(?i)advice\\W+(\\d+)$" first-pass))))
