@@ -74,8 +74,8 @@
     (#\l . :limit)
     (#\k . :key)
     (#\b . :ban)
-    (#\e . :ban-except)
-    (#\I . :invite-except)))
+    (#\e . :except)
+    (#\I . :invite)))
 
 (defparameter *char-to-user-modes-map*
   '((#\a . :away)
