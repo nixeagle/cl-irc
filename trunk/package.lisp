@@ -58,6 +58,7 @@
              :raw-message-string
              :make-connection
              :make-channel
+             :channel
              :client-log
              :find-channel
              :find-reply-name
