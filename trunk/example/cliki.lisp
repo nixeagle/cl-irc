@@ -7,7 +7,7 @@
 ;;; cliki.lisp, and invoke (cliki::start-cliki-bot "desirednickname"
 ;;; "desiredserver" "#channel1" "#channel2" "#channel3" ...)
 
-(defpackage :cliki (:use :common-lisp :irc :sb-bsd-sockets :cl-ppcre)
+(defpackage :cliki (:use :common-lisp :irc :cl-ppcre)
   (:export :start-cliki-bot :*cliki-nickserv-password*
 	   :*respond-to-general-hellos*))
 (in-package :cliki)
@@ -50,31 +50,47 @@
 			(or port-start (length url)))))
     (subseq url 7 host-end)))
 
+#+(or ccl allegro)
+(defun socket-connect (host port)
+  (#+ccl ccl:make-socket
+         #+allegro socket:make-socket
+         :connect :active
+         :remote-host host
+         :remote-port port))
+
+#+sbcl
+(defun socket-connect (host port)
+  (let ((s (make-instance 'sb-bsd-sockets:inet-socket
+                          :type :stream
+                          :protocol :tcp)))
+    (sb-bsd-sockets:socket-connect s (car (sb-bsd-sockets:host-ent-addresses
+                                           (sb-bsd-sockets:get-host-by-name host))) port)
+    (sb-bsd-sockets:socket-make-stream s
+                                       :element-type 'character
+                                       :input t
+                                       :output t
+                                       :buffering :none)))
+
 (defun url-connection (url)
-  (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp))
-	(host (url-host url))
-	(port (url-port url)))
-    (declare (ignore port))
-    (socket-connect
-     s (car (host-ent-addresses (get-host-by-name (url-host url))))
-     (url-port url))
-    (let ((stream (socket-make-stream s :input t :output t :buffering :full)))
-      ;; we are exceedingly unportable about proper line-endings here.
-      ;; Anyone wishing to run this under non-SBCL should take especial care
-      (format stream "GET ~A HTTP/1.0~%Host: ~A~%User-Agent: CLiki Bot~%~%" url host)
-      (force-output stream)
-      (list
-       (let* ((l (read-line stream))
-	      (space (position #\Space l)))
-	 (parse-integer l :start (1+ space) :junk-allowed t))
-       (loop for line = (read-line stream nil nil)
-	     until (or (null line) (eql (elt line 0) (code-char 13)))
-	     collect
-	     (let ((colon (position #\: line)))
-	       (cons (intern (string-upcase (subseq line 0 colon)) :keyword)
-		     (string-trim (list #\Space (code-char 13))
-				  (subseq line (1+ colon))))))
-       stream))))
+  (let* ((host (url-host url))
+         (port (url-port url))
+         (stream (socket-connect host port)))
+    ;; we are exceedingly unportable about proper line-endings here.
+    ;; Anyone wishing to run this under non-SBCL should take especial care
+    (format stream "GET ~A HTTP/1.0~%Host: ~A~%User-Agent: CLiki Bot~%~%" url host)
+    (force-output stream)
+    (list
+     (let* ((l (read-line stream))
+            (space (position #\Space l)))
+       (parse-integer l :start (1+ space) :junk-allowed t))
+     (loop for line = (read-line stream nil nil)
+           until (or (null line) (eql (elt line 0) (code-char 13)))
+           collect
+           (let ((colon (position #\: line)))
+             (cons (intern (string-upcase (subseq line 0 colon)) :keyword)
+                   (string-trim (list #\Space (code-char 13))
+                                (subseq line (1+ colon))))))
+     stream)))
 
 (defun encode-for-url (str)
   (setf str (regex-replace-all " " str "%20"))
@@ -83,13 +99,33 @@
   ;(format t "hi ~A~%" str)
   str)
 
+#+sbcl
+(defmacro host-with-timeout (timeout &body body)
+  `(sb-ext:with-timeout ,timeout ,@body))
+
+#+ccl
+(defmacro host-with-timeout (timeout &body body)
+  `(let ((interrupt-thread nil))
+    (setf interrupt-thread
+     (ccl:process-run-function 'timeout
+      (let ((process ccl:*current-process*))
+        (lambda ()
+          (sleep ,timeout)
+          (ccl:process-interrupt process
+                                 (lambda ()
+                                   (signal 'openmcl-timeout)))))))
+    (unwind-protect
+         (progn ,@body)
+      (if interrupt-thread
+          (ccl:process-kill interrupt-thread)))))
+
 (defun cliki-first-sentence (term)
   (let* ((cliki-url (format nil "http://www.cliki.net/~A"
 		     (encode-for-url term)))
 	 (url (concatenate 'string cliki-url "?source")))
     (block cliki-return
       (handler-case
-	  (sb-ext:with-timeout 5
+	  (host-with-timeout 5
 	    (destructuring-bind (response headers stream)
 		(block got
 		  (loop
@@ -138,7 +174,7 @@
 
 (defparameter *cliki-bot-help* "The minion bot supplies small definitions and performs lookups on CLiki. To use it, try ``minion: term?''. To add a term for IRC, try saying ``minion: add \"term\" as: definition'' or ``minion: alias \"term\" as: term''; otherwise, edit the corresponding CLiki page.")
 
-(defun cliki-lookup (term-with-question)
+(defun cliki-lookup (term-with-question &optional sender)
   (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2")))
     (setf first-pass (regex-replace-all "\\s\\s+" first-pass ""))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
@@ -156,9 +192,15 @@
 	    (setf first-pass (regex-replace-all "(:|/|\\\\|\\#)" first-pass ""))
 	    (or
 	     (if (string-equal first-pass "help") *cliki-bot-help*)
-	     (if (scan "^(?i)hello(\\s|$)" first-pass) "what's up?")
-	     (if (scan "^(?i)hi(\\s|$)" first-pass) "what's up?")
-	     (if (scan "^(?i)yo(\\s|$)" first-pass) "what's up?")
+             (if (scan "^(?i)hello(\\s|$)*" first-pass) "what's up?")
+	     (if (scan "^(?i)hi(\\s|$)*" first-pass) "what's up?")
+	     (if (scan "^(?i)yo(\\s|$)*" first-pass) "what's up?")
+	     (if (scan "^(?i)thank(s| you)(\\s|!|\\?|\\.|$)*" first-pass)
+		 (if sender
+		     (format nil "~A: you failed the inverse turing test!" sender)
+		   "you failed the inverse turing test!"))
+             (if (scan "^(?i)version(\\s|!|\\?|\\.|$)*" first-pass)
+                 (format nil "This is the minion bot, running on a ~A (~A) and running under ~A ~A." (machine-type) (machine-version) (lisp-implementation-type) (lisp-implementation-version)))
 	     (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
              (aif (or (let ((term (cdr (assoc first-pass *small-definitions* :test #'string-equal))))
                         (if term (if (stringp term) term (cliki-lookup (car term)))))
@@ -183,7 +225,7 @@
 (defun msg-hook (message)
   (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
     (if (valid-cliki-message message)
-	(privmsg *cliki-connection* respond-to (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "")))
+	(privmsg *cliki-connection* respond-to (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") (source message)))
       (if (string-equal (first (arguments message)) *cliki-nickname*)
 	  (privmsg *cliki-connection* respond-to (cliki-lookup (trailing-argument message)))
 	(if (anybody-here (trailing-argument message))
@@ -203,8 +245,7 @@
   (mapcar #'(lambda (channel) (join *cliki-connection* channel)) channels)
   (add-hook *cliki-connection* 'irc::irc-privmsg-message 'msg-hook)
   (add-hook *cliki-connection* 'irc::irc-notice-message 'notice-hook)
-  #+sbcl (start-background-message-handler *cliki-connection*)
-  #-sbcl (read-message-loop *cliki-connection*))
+  (start-background-message-handler *cliki-connection*))
 
 (defun shuffle-hooks ()
   (irc::remove-hooks *cliki-connection* 'irc::irc-privmsg-message)

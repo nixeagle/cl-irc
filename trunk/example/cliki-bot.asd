@@ -17,8 +17,7 @@
     :licence "MIT"
     :description "IRC bot for SBCL"
     :depends-on
-      #+sbcl (:cl-irc :cl-ppcre)
-      #-sbcl (:sbcl)
+      (:cl-irc :cl-ppcre)
     :properties ((#:author-email . "cl-irc-devel@common-lisp.net")
                  (#:date . "$Date$")
                  ((#:albert #:output-dir) . "doc/api-doc/")

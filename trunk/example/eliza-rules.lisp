@@ -21,6 +21,9 @@
    (((?* ?x) bot (?* ?y))
     (|I'm| not a |bot.| I prefer the term |``electronically composed''.|))
 
+   ((seen ?x)
+    (?x was last seen 5y6m14d32h43m10s |ago,| saying |"minion: when are you going to support seen?"|))
+
    (((?* ?x) did you (?* ?y))
     (|no, I didn't| ?y)
     (|yes, I| ?y))
@@ -34,6 +37,9 @@
     (Thanks!))
 
    ((bot snack)
+    (Thanks!))
+
+   ((welcome (?* ?y))
     (Thanks!))
 
    ((not much) (good))

@@ -20,7 +20,7 @@
 (in-package :clhs)
 
 ;;; CLHS. This will be the default lookup.
-(defparameter *hyperspec-pathname* #p"/home/bmastenbrook/HyperSpec/")
+(defparameter *hyperspec-pathname* #p"/Users/chandler/HyperSpec/")
 
 (defparameter *hyperspec-map-file* (merge-pathnames "Data/Map_Sym.txt" *hyperspec-pathname*))
 
@@ -167,8 +167,12 @@
   (setf *clhs-connection* (connect :nickname *clhs-nickname* :server server))
   (mapcar #'(lambda (channel) (join *clhs-connection* channel)) channels)
   (add-hook *clhs-connection* 'irc::irc-privmsg-message 'msg-hook)
-  #+sbcl (start-background-message-handler *clhs-connection*)
-  #-sbcl (read-message-loop *clhs-connection*))
+  #+(or sbcl
+        openmcl)
+  (start-background-message-handler *clhs-connection*)
+  #-(or sbcl
+        openmcl)
+  (read-message-loop *clhs-connection*))
 
 (defun shuffle-hooks ()
   (irc::remove-hooks *clhs-connection* 'irc::irc-privmsg-message)
