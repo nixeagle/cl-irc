@@ -308,7 +308,7 @@ between the two users.")))
                    :user user
                    :stream (sb-bsd-sockets:socket-make-stream socket :input t :output t :buffering :none)
                    :socket socket
-                   :output-stream t))
+                   :output-stream output-stream))
   #+openmcl
   (let ((socket-stream (ccl:make-socket :remote-host remote-address
                                         :remote-port remote-port)))
