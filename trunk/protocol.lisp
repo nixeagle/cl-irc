@@ -220,6 +220,7 @@ this stream.")
                      irc-kick-message
                      irc-nick-message
                      irc-mode-message
+                     irc-rpl_channelmodeis-message
                      ctcp-time-message
                      ctcp-source-message
                      ctcp-finger-message

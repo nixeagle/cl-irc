@@ -186,6 +186,27 @@ objects in sync."))
   (let ((connection (connection message)))
     (remove-user-everywhere connection (find-user connection (source message)))))
 
+(defmethod default-hook ((message irc-rpl_channelmodeis-message))
+  (destructuring-bind
+      (target &rest arguments)
+      ;; ignore the my own nick which is the first message argument
+      (rest (arguments message))
+    (let* ((connection (connection message))
+           (target (find-channel connection target))
+           (mode-changes
+            (when target
+              (parse-mode-arguments connection target arguments
+                                    :server-p (user connection)))))
+      (dolist (change mode-changes)
+        (destructuring-bind
+            (op mode-name value)
+            change
+          (unless (has-mode-p target mode-name)
+            (add-mode target mode-name
+                      (make-mode connection target mode-name)))
+          (funcall (if (char= #\+ op) #'set-mode #'unset-mode)
+                   target mode-name value))))))
+
 (defmethod default-hook ((message irc-mode-message))
   (destructuring-bind
       (target &rest arguments)
