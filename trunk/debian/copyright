@@ -1,7 +1,7 @@
 Debian Copyright Section
 ========================
 
-Upstream Source URL: http://common-lisp.net/projects/net-nittin-irc
+Upstream Source URL: http://common-lisp.net/projects/cl-irc
 Upstream Authors: Erik Enge and Brian Mastenbrook
 Debian Maintainer:  Kevin M. Rosenberg <kmr@debian.org>
 
