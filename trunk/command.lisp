@@ -139,8 +139,8 @@ registered."
   (remove-all-users connection)
   (send-irc-message connection :quit message)
   #+(and sbcl (not sb-thread))
-  (sb-sys:invalidate-descriptor (sb-bsd-sockets:socket-file-descriptor
-                               (server-socket connection)))
+  (sb-sys:invalidate-descriptor (sb-sys:fd-stream-fd
+                                        (server-stream connection)))
   (close (server-stream connection)))
 
 (defmethod squit ((connection connection) (server string) (comment string))
@@ -249,13 +249,11 @@ registered."
 
 (defun socket-stream (socket)
   #+sbcl
-  (values
-   (sb-bsd-sockets:socket-make-stream socket
-                                      :element-type 'character
-                                      :input t
-                                      :output t
-                                      :buffering :none)
-   socket)
+  (sb-bsd-sockets:socket-make-stream socket
+                                     :element-type 'character
+                                     :input t
+                                     :output t
+                                     :buffering :none)
   #+openmcl
   socket)
 
@@ -279,20 +277,18 @@ registered."
                      (port *default-irc-server-port*)
                      (logging-stream t))
   "Connect to server and return a connection object."
-  (multiple-value-bind (stream socket)
-      (socket-connect server port)
-    (let* ((user (make-user :nickname nickname
-                            :username username
-                            :realname realname))
-           (connection (make-connection :server-stream stream
-                                        :server-socket socket
-                                        :client-stream logging-stream
-                                        :user user
-                                        :server-name server)))
+  (let* ((stream (socket-connect server port))
+         (user (make-user :nickname nickname
+                          :username username
+                          :realname realname))
+         (connection (make-connection :server-stream stream
+                                      :client-stream logging-stream
+                                      :user user
+                                      :server-name server)))
     (nick connection nickname)
     (user- connection (or username nickname) mode (or realname nickname))
     (add-default-hooks connection)
-    connection)))
+    connection))
 
 (defmethod trace- ((connection connection) &optional (target ""))
   (send-irc-message connection :trace nil target))
