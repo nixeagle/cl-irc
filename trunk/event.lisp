@@ -78,9 +78,7 @@ objects in sync."))
     (dolist (nickname (tokenize-string (trailing-argument message)))
       (let ((user (find-or-make-user connection
                                      (canonicalize-nickname connection
-                                                            nickname)
-                                     :username (user message)
-                                     :hostname (host message))))
+                                                            nickname))))
         (unless (equal user (user connection))
           (add-user connection user)
           (add-user channel user))))))
