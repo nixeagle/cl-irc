@@ -137,11 +137,12 @@ registered."
 (defmethod quit ((connection connection) &optional (message *default-quit-message*))
   (remove-all-channels connection)
   (remove-all-users connection)
-  (send-irc-message connection :quit message)
-  #+(and sbcl (not sb-thread))
-  (sb-sys:invalidate-descriptor (sb-sys:fd-stream-fd
-                                        (server-stream connection)))
-  (close (server-stream connection)))
+  (unwind-protect
+      (send-irc-message connection :quit message)
+    #+(and sbcl (not sb-thread))
+    (sb-sys:invalidate-descriptor (sb-sys:fd-stream-fd
+                                   (server-stream connection)))
+    (close (server-stream connection))))
 
 (defmethod squit ((connection connection) (server string) (comment string))
   (send-irc-message connection :squit comment server))
