@@ -46,6 +46,12 @@
     (5 :rpl_isupport) ;; The RFC was wrong to define RPL_BOUNCE here,
      ;; see http://www.irc.org/tech_docs/draft-brocklesby-irc-isupport-03.txt
     (10 :rpl_bounce)
+    (15 :rpl_map) ; From ircd 2.11 source
+    (17 :rpl_mapend) ; From ircd 2.11 source
+    (18 :rpl_mapstart) ; From ircd 2.11 source
+    (20 :rpl_hello) ; From ircd 2.11 source
+    (42 :rpl_yourid) ; From ircd 2.11 source
+    (43 :rpl_savenick) ; From ircd 2.11 source
     (200 :rpl_tracelink)
     (201 :rpl_traceconnecting)
     (202 :rpl_tracehandshake)
