@@ -50,9 +50,17 @@
        it
        (format nil "Nothing was found for: ~A" str)))
 
+(defun elisp-lookup (str)
+  (aif (and (find-package :elisp-lookup)
+            (funcall (intern "SYMBOL-LOOKUP" :elisp-lookup)
+                     str))
+       it
+       (format nil "Nothing was found for: ~A" str)))
+
 (defparameter *spec-providers*
-  '((clhs-lookup "clhs" "The Comon Lisp HyperSpec")
-    (r5rs-lookup "r5rs" "The Revised 5th Ed. Report on the Algorithmic Language Scheme")))
+  '((clhs-lookup "clhs" "The Common Lisp HyperSpec")
+    (r5rs-lookup "r5rs" "The Revised 5th Ed. Report on the Algorithmic Language Scheme")
+    (elisp-lookup "elisp" "GNU Emacs Lisp Reference Manual")))
 
 (defun valid-message (string prefix &key space-allowed)
   (if (eql (search prefix string :test #'char-equal) 0)
@@ -75,7 +83,8 @@
                          (source message)
                          (first (arguments message))))
         (to-lookup (strip-address (trailing-argument message))))
-    (if (member to-lookup '("help" "help?") :test #'string-equal)
+    (if (and (not (string= to-lookup (trailing-argument message)))
+             (member to-lookup '("help" "help?") :test #'string-equal))
         (progn
           (privmsg *connection* destination
                    (format nil "To use the ~A bot, say something like \"database term\", where database is one of (~{~S~^, ~}) and term is the desired lookup."
