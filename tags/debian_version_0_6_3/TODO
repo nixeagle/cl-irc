@@ -1,0 +1,21 @@
+
+  - Modes needs to be updated for users and channels.
+
+  - Add DCC
+
+    - I would really like usocket first
+
+  - If a message (as in PRIVMSG) is longer than 512 characters
+  (including carriage return and linefeed) we should probably split
+  the message into several on behalf of the user.
+
+    - should send-irc-message automatically do this for you?
+
+  - Add ignore
+
+  - Document inconsistencies between IRC servers (ref. undernet
+  servers send out channel name in arguments rather than
+  trailing-messages on a part/quit message)
+
+  - When doing a whois on a user the library ought to snap up the
+  channels in WHOISCHANNELS as channels the user is currently on.
