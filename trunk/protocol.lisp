@@ -33,6 +33,11 @@
     :initarg :server-stream
     :accessor server-stream
     :documentation "Stream used to talk to the IRC server.")
+   (server-capabilities
+    :initform *default-isupport-values*
+    :accessor server-capabilities
+    :documentation "Assoc array for rpl_isupport message;
+see http://www.irc.org/tech_docs/draft-brocklesby-irc-isupport-03.txt")
    (client-stream
     :initarg :client-stream
     :accessor client-stream
@@ -73,6 +78,9 @@ this stream.")
 (defgeneric remove-hooks (connection class))
 (defgeneric remove-all-hooks (connection))
 
+(defgeneric case-map-name (connection))
+(defgeneric re-apply-case-mapping (connection))
+
 (defun make-connection (&key (user nil)
                              (server-name "")
                              (server-stream nil)
@@ -88,7 +96,8 @@ this stream.")
     connection))
 
 (defmethod add-default-hooks ((connection connection))
-  (dolist (message '(irc-rpl_whoisuser-message
+  (dolist (message '(irc-rpl_isupport-message
+                     irc-rpl_whoisuser-message
                      irc-rpl_list-message
                      irc-rpl_topic-message
                      irc-rpl_namreply-message
@@ -221,6 +230,41 @@ server, via the `connection'."
 (defmethod remove-all-hooks ((connection connection))
   (clrhash (hooks connection)))
 
+(defmethod case-map-name ((connection connection))
+  (let ((case-mapping (assoc "CASEMAPPING" (server-capabilities connection)
+                             :test #'equal)))
+    (intern (string-upcase (second case-mapping)) (find-package "KEYWORD"))))
+
+(defmethod re-apply-case-mapping ((connection connection))
+  (setf (normalized-nickname (user connection))
+        (normalize-nickname connection (nickname (user connection))))
+  (flet ((set-new-users-hash (object)
+           (let ((new-users (make-hash-table :test #'equal)))
+             (maphash
+              #'(lambda (norm-nick user)
+                  (declare (ignore norm-nick))
+                  (setf (gethash
+                         (setf (normalized-nickname user)
+                               (normalize-nickname connection
+                                                   (nickname user)))
+                         new-users) user))
+              (users object))
+             (setf (users object) new-users))))
+
+    (set-new-users-hash connection)
+    (let ((new-channels (make-hash-table :test #'equal)))
+      (maphash #'(lambda (norm-name channel)
+                   (declare (ignore norm-name))
+                   (setf (gethash
+                          (setf (normalized-channel-name channel)
+                                (normalize-channel-name connection
+                                                        (name channel)))
+                          new-channels) channel)
+                   (set-new-users-hash channel))
+               (channels connection))
+      (setf (channels connection) new-channels))))
+
+
 ;;
 ;; DCC Connection
 ;;
@@ -341,12 +385,13 @@ been populated by a LIST command.")))
   (print-unreadable-object (object stream :type t :identity t)
     (princ (name object) stream)))
 
-(defun normalize-channel-name (string)
+(defun normalize-channel-name (connection string)
   "Normalize `string' so that it represents an all-downcased channel
 name."
-  (string-downcase string))
+  (irc-string-downcase (case-map-name connection) string))
 
-(defun make-channel (&key (name "")
+(defun make-channel (connection
+                     &key (name "")
                           (topic "")
                           (modes nil)
                           (users nil)
@@ -354,7 +399,8 @@ name."
   (let ((channel
          (make-instance 'channel
                         :name name
-                        :normalized-name (normalize-channel-name name)
+                        :normalized-name
+                        (normalize-channel-name connection name)
                         :topic topic
                         :modes modes
                         :user-count user-count)))
@@ -371,7 +417,7 @@ name."
 (defmethod find-channel ((connection connection) (channel string))
   "Return channel as designated by `channel'.  If no such channel can
 be found, return nil."
-  (let ((channel-name (normalize-channel-name channel)))
+  (let ((channel-name (normalize-channel-name connection channel)))
     (gethash channel-name (channels connection))))
 
 (defmethod remove-all-channels ((connection connection))
@@ -429,30 +475,31 @@ be found, return nil."
             (hostname object)
             (realname object))))
 
-(defun make-user (&key (nickname "")
+(defun make-user (connection
+                  &key (nickname "")
                        (username "")
                        (hostname "")
                        (realname ""))
   (make-instance 'user
                  :nickname nickname
-                 :normalized-nickname (normalize-nickname nickname)
+                 :normalized-nickname (normalize-nickname connection nickname)
                  :username username
                  :hostname hostname
                  :realname realname))
 
-(defun canonicalize-nickname (nickname)
-  (if (find (char nickname 0) "@+*")
+(defun canonicalize-nickname (connection nickname)
+  (if (find (char nickname 0)
+            (parse-isupport-prefix-argument
+             (second (assoc "PREFIX"
+                            (server-capabilities connection)
+                            :test #'string=))))
       (subseq nickname 1)
       nickname))
 
-(defun normalize-nickname (string)
+(defun normalize-nickname (connection string)
   "Normalize `string' so that represents an all-downcased IRC
 nickname."
-  (let* ((new-string (substitute #\[ #\{ string))
-         (new-string (substitute #\] #\} new-string))
-         (new-string (substitute #\\ #\| new-string))
-         (new-string (substitute #\~ #\^ new-string)))
-    (string-downcase new-string)))
+  (irc-string-downcase (case-map-name connection) string))
 
 (defgeneric find-user (connection nickname))
 (defgeneric add-user (object user))
@@ -466,7 +513,7 @@ nickname."
 (defmethod find-user ((connection connection) (nickname string))
   "Return user as designated by `nickname' or nil if no such user is
 known."
-  (let ((nickname (normalize-nickname nickname)))
+  (let ((nickname (normalize-nickname connection nickname)))
     (or (gethash nickname (users connection))
         (when (string= nickname (nickname (user connection)))
           (user connection)))))
@@ -515,7 +562,8 @@ may be already be on."
 (defmethod find-or-make-user ((connection connection) nickname &key (username "")
                               (hostname "") (realname ""))
   (or (find-user connection nickname)
-      (make-user :nickname nickname
+      (make-user connection
+                 :nickname nickname
                  :username username
                  :hostname hostname
                  :realname realname)))
@@ -525,7 +573,8 @@ may be already be on."
         (channels (channels user)))
     (remove-user connection user)
     (setf (nickname new-user) new-nickname)
-    (setf (normalized-nickname new-user) (normalize-nickname new-nickname))
+    (setf (normalized-nickname new-user)
+          (normalize-nickname connection new-nickname))
     (dolist (channel channels)
       (remove-user channel user)
       (add-user channel new-user))
@@ -655,7 +704,7 @@ may be already be on."
 	  (find-class ',name))
 	(export ',name)
 	(defclass ,name (ctcp-mixin irc-message) ())))))
-  
+
 (defmacro create-ctcp-message-classes (class-list)
   `(progn ,@(mapcar #'define-ctcp-message class-list)))
 

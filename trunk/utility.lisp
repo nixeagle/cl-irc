@@ -156,3 +156,36 @@ returned."
             (values end-position
                     (subseq string cut-from end-position))
           (values start nil))))))
+
+(defgeneric irc-string-downcase (map-name string &key start end))
+
+(defmethod irc-string-downcase (map-name
+                                string &key (start 0) end)
+  (declare (ignore map-name))
+  (let* ((new-string (substitute #\[ #\{ string :start start :end end))
+         (new-string (substitute #\] #\} new-string :start start :end end))
+         (new-string (substitute #\\ #\| new-string :start start :end end))
+         (new-string (substitute #\~ #\^ new-string :start start :end end)))
+    (string-downcase new-string :start start :end end)))
+
+(defmethod irc-string-downcase ((map-name (eql :ascii))
+                                string &key (start 0) end)
+  (declare (ignore map-name))
+  (string-downcase string :start start :end end))
+
+(defun parse-isupport-prefix-argument (prefix)
+  (declare (type string prefix))
+  (let ((closing-paren-pos (position #\) prefix)))
+    (when (and (eq (elt prefix 0) #\( )
+               closing-paren-pos)
+      (let ((prefixes (subseq prefix (1+ closing-paren-pos)))
+            (modes (subseq prefix 1 closing-paren-pos)))
+        (when (= (length prefixes)
+                 (length modes))
+          (values prefixes modes))))))
+
+(defun parse-isupport-multivalue-argument (argument)
+  (declare (type string argument))
+  (mapcar #'(lambda (x)
+              (split-sequence:split-sequence #\: x))
+          (split-sequence:split-sequence #\, argument)))

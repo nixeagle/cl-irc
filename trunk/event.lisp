@@ -20,6 +20,31 @@ message."))
 of the IRC message to keep the connection, channel and user
 objects in sync."))
 
+(defmethod default-hook ((message irc-rpl_isupport-message))
+  (let* ((capabilities (cdr (arguments message)))
+         (connection (connection message))
+         (current-case-mapping (case-map-name connection)))
+    (setf (server-capabilities connection)
+          (let ((new-values (mapcar #'(lambda (x)
+                                        (let ((eq-pos (position #\= x)))
+                                          (if eq-pos
+                                              (list (subseq x 0 eq-pos)
+                                                    (subseq x (1+ eq-pos)))
+                                            (list x)))) capabilities)))
+            (mapcar #'(lambda (x)
+                        (or (assoc x new-values :test #'string=)
+                            (assoc x *default-isupport-values*
+                                   :test #'string=)))
+                    (remove-duplicates
+                     (mapcar #'first (append new-values
+                                             *default-isupport-values*))
+                             :test #'string=))))
+
+    (when (not (equal current-case-mapping
+                      (case-map-name connection)))
+      ;; we need to re-normalize nicks and channel names
+      (re-apply-case-mapping connection))))
+
 (defmethod default-hook ((message irc-rpl_whoisuser-message))
   (let ((user (find-user (connection message)
                          (second (arguments message))))
@@ -37,7 +62,8 @@ objects in sync."))
         (user-count (parse-integer (or (third (arguments message)) "0")))
         (topic (trailing-argument message)))
     (add-channel connection (or (find-channel connection channel)
-                                (make-channel :name channel
+                                (make-channel connection
+                                              :name channel
                                               :topic topic
                                               :user-count user-count)))))
 
@@ -51,7 +77,8 @@ objects in sync."))
          (channel (find-channel connection (car (last (arguments message))))))
     (dolist (nickname (tokenize-string (trailing-argument message)))
       (let ((user (find-or-make-user connection
-                                     (canonicalize-nickname nickname)
+                                     (canonicalize-nickname connection
+                                                            nickname)
                                      :username (user message)
                                      :hostname (host message))))
         (unless (equal user (user connection))
@@ -69,7 +96,8 @@ objects in sync."))
                 :hostname (host message)
                 :username (user message)))
          (channel (or (find-channel connection (trailing-argument message))
-                      (make-channel :name (trailing-argument message)))))
+                      (make-channel connection
+                                    :name (trailing-argument message)))))
     (if (self-message-p message)
         (add-channel connection channel)
         (progn

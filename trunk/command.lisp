@@ -278,13 +278,14 @@ registered."
                      (logging-stream t))
   "Connect to server and return a connection object."
   (let* ((stream (socket-connect server port))
-         (user (make-user :nickname nickname
-                          :username username
-                          :realname realname))
          (connection (make-connection :server-stream stream
                                       :client-stream logging-stream
-                                      :user user
-                                      :server-name server)))
+                                      :server-name server))
+         (user (make-user connection
+                          :nickname nickname
+                          :username username
+                          :realname realname)))
+    (setf (user connection) user)
     (nick connection nickname)
     (user- connection (or username nickname) mode (or realname nickname))
     (add-default-hooks connection)

@@ -26,6 +26,16 @@
 (defvar *default-quit-message*
   "Common Lisp IRC library - http://common-lisp.net/project/cl-irc")
 
+(defparameter *default-isupport-values*
+  '(("CASEMAPPING" "rfc1459")
+    ("CHANNELLEN" "200")
+    ("CHANTYPES" "#&")
+    ("MODES" "3")
+    ("NICKLEN" "9")
+    ("PREFIX" "(ov)@+")
+    ("TARGMAX")))
+
+
 (defvar *dcc-connections* nil)
 
 (defparameter *reply-names*
