@@ -750,14 +750,6 @@ known."
      (when (and val (eq (value-type val) :user))
        (unset-mode channel prop user))))
 
-(defmethod remove-channel ((channel channel) (user user))
-  "Remove `channel' from `user'."
-  (warn
-   (concatenate 'string
-                "use of depricated API (remove-channel channel user): "
-                "(remove-channel user channel) is now preferred"))
-  (remove-channel user channel))
-
 (defmethod remove-channel ((user user) (channel channel))
   "Remove `channel' from `user'."
   (setf (channels user) (remove channel (channels user))))

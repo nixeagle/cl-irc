@@ -15,7 +15,6 @@
              :start-background-message-handler
              :stop-background-message-handler
              :socket-connect
-             :send-message
              :server-name
              :no-such-reply
              :irc-mode
@@ -41,9 +40,6 @@
              :server-stream
              :client-stream
              :channels
-             :configuration
-             :dangling-users
-             :channel-list
              :add-hook
              :remove-hook
              :remove-hooks
