@@ -1,4 +1,4 @@
- ;;;; $Id$
+;;;; $Id$
 ;;;; $Source$
 
 ;;;; cliki.lisp - CLiki as an infobot; only works on SBCL.
@@ -69,6 +69,14 @@
 (defun add-alias (term defn)
   (push (cons term defn) *aliases*)
   (write-top-definition :of *aliases* :type :alias))
+
+(defun cliki-apropos (search-string)
+  (let ((found (remove-duplicates
+                 (loop for (term . defn) in *small-definitions*
+                      if (search search-string defn :test #'string-equal)
+                      collect term) :test #'string-equal)))
+    (if found (format nil "Matches: ~{~S~^ ~}" found)
+        "No Matches")))
 
 (defvar *lookup-depth* 0)
 
@@ -416,7 +424,10 @@
               (format nil "If you say multiple words to me which I don't recognize and it's not found as a lookup, you might get a sarcastic reply. Don't abuse this too much.")))
     ("advice" .
      ,(lambda (nick)
-              (format nil "Try saying something like ``~A: advice #11904'' to get some advice." nick)))))
+              (format nil "Try saying something like ``~A: advice #11904'' to get some advice." nick)))
+    ("apropos" .
+     ,(lambda (nick)
+              (format nil "Try ``~A: apropos foo'' to search for all small definitions containing ''foo''." nick)))))
 
 (defun cliki-bot-help (nick)
   (format nil "There are multiple help modules. Try ``/msg ~A help kind'', where kind is one of: ~{\"~A\"~^, ~}."
@@ -650,6 +661,9 @@
                    (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
                    (if (scan "^(?i)chant(\\s|!|\\?|\\.|$)*" first-pass)
                        (format nil "MORE ~A" *more*))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)apropos\\s+(.+\\S)\\s*$" first-pass))))
+                     (and str
+                          (cliki-apropos (elt str 0))))
                    (if (scan "^(?i)advice$" first-pass)
                        (random-advice))
                    (let ((str (nth-value 1 (scan-to-strings "^(?i)advise\\s+(for\\s+|)(\\S+)$" first-pass))))

@@ -112,9 +112,15 @@
                    (format nil "To use the ~A bot, say something like \"database term\", where database is one of (~{~S~^, ~}) and term is the desired lookup. The available databases are:"
                            *nickname*
                            (mapcar #'second *spec-providers*)))
-          (loop for (a b c d) on *spec-providers* by #'cddddr
-	       do (privmsg *connection* destination
-			   "~@{~{~*~S, ~A~}~}~}" a b c d))
+          (loop for i from 1 for j in *spec-providers*
+                with elts = nil
+                do (push j elts)
+                if (zerop (mod i 4))
+                do (progn
+                     (privmsg *connection* destination
+                              (format nil "~{~{~*~S, ~A~}~^; ~}"
+                                      (nreverse elts)))
+                     (setf elts nil)))
 	  )
         (loop for type in *spec-providers*
               for actual-fun = (if (typep (first type) 'symbol)
