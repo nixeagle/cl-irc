@@ -14,6 +14,7 @@
              :read-message
              :start-background-message-handler
              :stop-background-message-handler
+             :socket-connect
              :send-message
              :server-name
              :no-such-reply

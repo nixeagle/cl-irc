@@ -21,6 +21,7 @@
    (((?* ?x) bot (?* ?y))
     (|I'm| not a |bot.| I prefer the term |``electronically composed''.|))
 
+   #-armedbear
    ((seen ?x)
     (?x was last seen 5y6m14d32h43m10s |ago,| saying |"minion: when are you going to support seen?"|))
 
@@ -44,14 +45,17 @@
 
    ((not much) (good))
 
+   #-armedbear
    (((?* ?x) linux (?* ?y))
     (I run on Crux Linux - |http://www.crux.nu/|))
 
+   #-armedbear
    (((?* ?x) crux (?* ?y))
     (I like running on Crux Linux))
 
    (((?* ?x) slackware (?* ?y))
     (Slackware is nice but I like Crux))
+   #-armedbear
    (((?* ?x) debian (?* ?y))
     (|baah, use crux: http://www.crux.nu/|))
 
@@ -376,7 +380,7 @@
     (superman) (bill clinton) (king kong) (me))
 
    ((what (?* ?x))
-    (a |man, a plan, a canal: panama|)
+    (a |man, a plan, a canal - panama|)
     (a banana)
     (42))
 

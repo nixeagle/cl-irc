@@ -245,8 +245,7 @@ registered."
     (sb-bsd-sockets:socket-connect s (car (sb-bsd-sockets:host-ent-addresses
                                            (sb-bsd-sockets:get-host-by-name host))) port)
     s)
-  #+openmcl
-  (ccl:make-socket :remote-host host :remote-port port))
+  )
 
 (defun socket-stream (socket)
   #+sbcl
@@ -258,6 +257,18 @@ registered."
   #+openmcl
   socket)
 
+(defun socket-connect (server port)
+  #+lispworks (comm:open-tcp-stream server port :errorp t)
+  #+cmu       (sys:make-fd-stream (ext:connect-to-inet-socket server port)
+                                  :input t
+                                  :output t
+                                  :element-type 'character)
+  #+allegro (socket:make-socket :remote-host server :remote-port port)
+  #+sbcl (socket-stream (connect-to-server-socket server port))
+  #+openmcl (ccl:make-socket :remote-host server :remote-port port)
+  #+armedbear (ext:get-socket-stream (ext:make-socket server port))
+  )
+  
 (defun connect (&key (nickname *default-nickname*)
                      (username nil)
                      (realname nil)
@@ -266,20 +277,11 @@ registered."
                      (port *default-irc-server-port*)
                      (logging-stream t))
   "Connect to server and return a connection object."
-  (let* ((socket #+(or sbcl openmcl) (connect-to-server-socket server port))
-         (stream #+lispworks (comm:open-tcp-stream server port :errorp t)
-                 #+cmu       (sys:make-fd-stream (ext:connect-to-inet-socket server port)
-                                                 :input t
-                                                 :output t
-                                                 :element-type 'character)
-                 #+allegro (socket:make-socket :remote-host server :remote-port port)
-                 #+sbcl (socket-stream socket)
-                 #+openmcl socket)
+  (let* ((stream (socket-connect server port))
          (user (make-user :nickname nickname
                           :username username
                           :realname realname))
-         (connection (make-connection :server-socket socket
-                                      :server-stream stream
+         (connection (make-connection :server-stream stream
                                       :client-stream logging-stream
                                       :user user
                                       :server-name server)))

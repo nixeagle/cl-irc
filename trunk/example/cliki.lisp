@@ -51,27 +51,6 @@
 			(or port-start (length url)))))
     (subseq url 7 host-end)))
 
-#+(or ccl allegro)
-(defun socket-connect (host port)
-  (#+ccl ccl:make-socket
-         #+allegro socket:make-socket
-         :connect :active
-         :remote-host host
-         :remote-port port))
-
-#+sbcl
-(defun socket-connect (host port)
-  (let ((s (make-instance 'sb-bsd-sockets:inet-socket
-                          :type :stream
-                          :protocol :tcp)))
-    (sb-bsd-sockets:socket-connect s (car (sb-bsd-sockets:host-ent-addresses
-                                           (sb-bsd-sockets:get-host-by-name host))) port)
-    (sb-bsd-sockets:socket-make-stream s
-                                       :element-type 'character
-                                       :input t
-                                       :output t
-                                       :buffering :none)))
-
 (defun url-connection (url)
   (let* ((host (url-host url))
          (port (url-port url))
@@ -99,6 +78,11 @@
   (setf str (regex-replace-all "`" str "%60"))
   ;(format t "hi ~A~%" str)
   str)
+
+#-(or sbcl ccl)
+(defmacro host-with-timeout (timeout &body body)
+  (declare (ignore timeout))
+  `(progn ,@body))
 
 #+sbcl
 (defmacro host-with-timeout (timeout &body body)
@@ -178,7 +162,10 @@
        (symbol-macrolet ((it ,test))
          ,else))))
 
-(defparameter *cliki-attention-prefix* "^minion[,:]\\s+")
+(defun make-cliki-attention-prefix (nick)
+  (format nil "^~A[,:]\\s+" nick))
+
+(defparameter *cliki-attention-prefix* "")
 
 (defparameter *cliki-bot-help* "The minion bot supplies small definitions and performs lookups on CLiki. To use it, try ``minion: term?''. To add a term for IRC, try saying ``minion: add \"term\" as: definition'' or ``minion: alias \"term\" as: term''; otherwise, edit the corresponding CLiki page.")
 
@@ -259,6 +246,7 @@
   (read-small-definitions)
   (setf *cliki-nickname* nick)
   (setf *cliki-connection* (connect :nickname *cliki-nickname* :server server))
+  (setf *cliki-attention-prefix* (make-cliki-attention-prefix nick))
   (mapcar #'(lambda (channel) (join *cliki-connection* channel)) channels)
   (add-hook *cliki-connection* 'irc::irc-privmsg-message 'msg-hook)
   (add-hook *cliki-connection* 'irc::irc-notice-message 'notice-hook)

@@ -143,14 +143,15 @@ input."
   #+cmu (mp:make-process function :name name)
   #+lispworks (mp:process-run-function name nil function)
   #+sb-thread (sb-thread:make-thread function)
-  #+openmcl (ccl:process-run-function name function))
+  #+openmcl (ccl:process-run-function name function)
+  #+armedbear (ext:make-thread function))
 
 (defmethod start-background-message-handler ((connection connection))
   "Read messages from the `connection', parse them and dispatch
 irc-message-event on them. Returns background process ID if available."
   (flet ((do-loop () (read-message-loop connection)))
     (let ((name (format nil "irc-hander-~D" (incf *process-count*))))
-      #+(or allegro cmu lispworks sb-thread openmcl)
+      #+(or allegro cmu lispworks sb-thread openmcl armedbear)
       (start-process #'do-loop name)
       #+(and sbcl (not sb-thread))
       (sb-sys:add-fd-handler (sb-bsd-sockets:socket-file-descriptor
@@ -165,7 +166,8 @@ irc-message-event on them. Returns background process ID if available."
     #+allegro (mp:process-kill process)
     #+sb-thread (sb-thread:destroy-thread process)
     #+lispworks (mp:process-kill process)
-    #+openmcl (ccl:process-kill process))
+    #+openmcl (ccl:process-kill process)
+    #+armedbear (ext:destroy-thread process))
 
 (defmethod read-message-loop ((connection connection))
   (loop while (read-message connection)))
@@ -633,7 +635,7 @@ may be already be on."
     :initarg :ctcp-command
     :accessor ctcp-command)))
 
-(defclass standard-ctcp-message (ctcp-mixin message) ())
+(defclass standard-ctcp-message (ctcp-mixin irc-message) ())
 
 (defgeneric find-ctcp-message-class (type))
 
