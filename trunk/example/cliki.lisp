@@ -179,7 +179,7 @@
     (when (not *advice-db*)
       (with-open-file (ad *advice-file* :direction :input)
         (setf *advice-db* (read ad))))
-    (or (cddr (assoc num *advice-db*))
+    (or (cdr (assoc num *advice-db*))
         "You can't just make up advice numbers and expect a response.")))
 
 (defun random-advice ()
@@ -503,6 +503,8 @@
                                 (person (case (car strings)
                                         (:forward (elt (cdr strings) 1))
                                         (:backward (elt (cdr strings) 3))))
+                                (person (if (string-equal person "me")
+                                            (or sender channel "you")))
                                 (about (cliki-lookup term :sender sender
                                                     :channel channel)))
                            (if about
@@ -587,15 +589,20 @@
                        (format nil "MORE ~A" *more*))
                    (if (scan "^(?i)advice$" first-pass)
                        (random-advice))
-                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advise\\s+(\\S+)$" first-pass))))
-                     (and str
-                          (format nil "~A: ~A" (elt str 0)
-                                  (random-advice))))
-                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(\\S+)\\s+(on|about)\\s+(.+)$" first-pass))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advise\\s+(for\\s+|)(\\S+)$" first-pass))))
                      (and str
                           (format nil "~A: ~A"
-                                  (elt str 0)
-                                  (search-advice (elt str 2)))))
+                                  (if (string-equal (elt str 1) "me")
+                                      (or sender channel "you")
+                                      (elt str 1))
+                                  (random-advice))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(for\\s+|)(\\S+)\\s+(on|about)\\s+(.+)$" first-pass))))
+                     (and str
+                          (format nil "~A: ~A"
+                                  (if (string-equal (elt str 1) "me")
+                                      (or sender channel "you")
+                                      (elt str 1))
+                                  (search-advice (elt str 3)))))
                    (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(on|about)\\s+(.+)$" first-pass))))
                      (and str
                           (search-advice (elt str 1))))
@@ -637,17 +644,22 @@
 	  (scan "^(?i)\\s*(hello|hi|yo)\\s*(channel|room|people|ppl|all|peeps|)\\s*$" string))))
 
 (defun msg-hook (message)
-  (scan-for-more (trailing-argument message))
-  (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
-    (if (valid-cliki-message message)
-        (let ((response (ignore-errors (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message))))))
-          (and response (privmsg *cliki-connection* respond-to response)))
-      (if (string-equal (first (arguments message)) *cliki-nickname*)
-          (aif (ignore-errors (cliki-lookup (trailing-argument message) :sender (source message)))
-               (privmsg *cliki-connection* respond-to it))
-          (if (anybody-here (trailing-argument message))
-              (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))
-    (take-care-of-memos respond-to (source message))))
+  (handler-case
+      (progn
+        (scan-for-more (trailing-argument message))
+        (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
+          (if (valid-cliki-message message)
+              (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
+                (and response (privmsg *cliki-connection* respond-to response)))
+              (if (string-equal (first (arguments message)) *cliki-nickname*)
+                  (aif (cliki-lookup (trailing-argument message) :sender (source message))
+                       (privmsg *cliki-connection* respond-to it))
+                  (if (anybody-here (trailing-argument message))
+                      (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))
+          (take-care-of-memos respond-to (source message))))
+    (serious-condition (c)
+      (format *trace-output* "Caught error: ~A~%" c)
+      #+sbcl (sb-debug:backtrace 5 *trace-output*))))
 
 (defvar *cliki-nickserv-password* "")
 
