@@ -168,6 +168,12 @@
    ((what (?* ?x) your (?* ?y) about chandler (?* ?z))
     (He never tells me anything - what ?x your ?y about my creator ?z))
 
+   ((who (?* ?x) is chandler (?* ?y))
+    (chandler is my master))
+
+   ((who (?* ?x) your master (?* ?y))
+    (chandler is my master))
+
    ((what (?* ?x) you (?* ?y) about (?* ?z))
     (I know nothing about ?z - what ?x you ?y about ?z))
    ((what (?* ?x) your (?* ?y) about (?* ?z))
@@ -392,8 +398,6 @@
      
    (((?* ?x))               
     (you speak nonsense)
-    (ich kann kein englisch)
-    (whoop! my pants are on fire!)
-    (look! behind you! superman!)
-    (watch out or |I'll| capture you in a closure)
-    (there must be methods of torture for people like you))))
+    (does torturing a poor bot with things beyond its comprehension please you?)
+    (please stop playing with |me...| I am not a toy)
+    (watch |out,| |you'll| make Krystof angry))))

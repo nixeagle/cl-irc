@@ -16,7 +16,7 @@
 ;;; invoke (clhs::start-clhs-bot "desirednickname" "desiredserver"
 ;;; "#channel1" "#channel2" "#channel3" ...)
 
-(defpackage :clhs (:use :common-lisp :irc))
+(defpackage :clhs (:use :common-lisp :irc) (:export :start-clhs-bot))
 (in-package :clhs)
 
 ;;; CLHS. This will be the default lookup.
