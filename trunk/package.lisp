@@ -20,6 +20,12 @@
              :parse-raw-message
              :normalize-nickname
              :normalize-channel-name
+             :name
+             :normalized-name
+             :topic
+             :modes
+             :user-count
+             :users
              :server-stream
              :client-stream
              :channels
@@ -31,6 +37,11 @@
              :remove-hooks
              :get-hooks
              :make-user
+             :nickname
+             :normalized-nickname
+             :username
+             :hostname
+             :realname
              :change-nickname
              :irc-message
              :source
