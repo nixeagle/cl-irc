@@ -164,7 +164,9 @@ irc-message-event on them. Returns background process ID if available."
                                       (handler-case
                                           (read-message connection)
                                         (invalidate-me (c)
-                                          (sb-sys:invalidate-descriptor fd)
+                                          (sb-sys:invalidate-descriptor
+                                           (sb-sys:fd-stream-fd
+                                            (invalidate-me-stream c)))
                                           (format t "Socket closed: ~A~%"
                                                   (invalidate-me-condition c)))))))))
 
