@@ -1,9 +1,9 @@
 ;;;; $Id$
 ;;;; $Source$
 
-;;;; clhs.lisp - an example IRC bot for net-nittin-irc
+;;;; clhs.lisp - an example IRC bot for cl-irc
 
-;;; clhs is an example IRC bot for net-nittin-irc. It runs on
+;;; clhs is an example IRC bot for cl-irc. It runs on
 ;;; irc.freenode.net in the channels #lisp and #clhs (preferred for
 ;;; testing). It responds to queries of the form "clhs symbol" for
 ;;; symbols in the spec, "clhs 3.1.2.1.2.1" for sections, and "clhs
@@ -12,7 +12,7 @@
 ;;; unpacked. You should also check out Mop_Sym.txt and put it in the
 ;;; directory where you will be running the bot from.
 
-;;; To use it, load the net-nittin-irc system, load clhs.lisp, and
+;;; To use it, load the cl-irc system, load clhs.lisp, and
 ;;; invoke (clhs::start-clhs-bot "desirednickname" "desiredserver"
 ;;; "#channel1" "#channel2" "#channel3" ...)
 

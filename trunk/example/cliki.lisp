@@ -3,7 +3,7 @@
 
 ;;;; cliki.lisp - CLiki as an infobot; only works on SBCL.
 
-;;; To use it, load the net-nittin-irc and cl-ppcre systems, load
+;;; To use it, load the cl-irc and cl-ppcre systems, load
 ;;; cliki.lisp, and invoke (cliki::start-cliki-bot "desirednickname"
 ;;; "desiredserver" "#channel1" "#channel2" "#channel3" ...)
 
