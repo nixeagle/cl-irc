@@ -1,4 +1,4 @@
-;;;; $Id$
+ ;;;; $Id$
 ;;;; $Source$
 
 ;;;; cliki.lisp - CLiki as an infobot; only works on SBCL.
@@ -459,31 +459,35 @@
   '("an" "a" "the"))
 
 (defun scan-for-more (s)
-    (let ((str (nth-value 1 (scan-to-strings "(?i)more\\W+(\\w+)\\W+(\\w+)\\W+(\\w+)" s))))
+  (let ((str (nth-value 1 (scan-to-strings "MORE\\W+((\\W|[A-Z0-9])+)([A-Z0-9])($|[^A-Z0-9])" s))))
     (or
      (and str
-          (or (member (elt str 0) *prepositions* :test #'string-equal)
-              (member (elt str 0) *conjunctions* :test #'string-equal)
-              (member (elt str 0) *articles* :test #'string-equal))
-          (or (member (elt str 1) *prepositions* :test #'string-equal)
-              (member (elt str 1) *conjunctions* :test #'string-equal)
-              (member (elt str 1) *articles* :test #'string-equal))
-          (setf *more* (string-upcase
-                        (concatenate 'string (elt str 0) " " (elt str 1)
-                                     " " (elt str 2)))))
-     (let ((str (nth-value 1 (scan-to-strings "(?i)more\\W+(\\w+)\\W+(\\w+)" s))))
+          (setf *more* (concatenate 'string (elt str 0) (elt str 2))))
+     (let ((str (nth-value 1 (scan-to-strings "(?i)more\\W+(\\w+)\\W+(\\w+)\\W+(\\w+)" s))))
        (or
         (and str
              (or (member (elt str 0) *prepositions* :test #'string-equal)
                  (member (elt str 0) *conjunctions* :test #'string-equal)
                  (member (elt str 0) *articles* :test #'string-equal))
+             (or (member (elt str 1) *prepositions* :test #'string-equal)
+                 (member (elt str 1) *conjunctions* :test #'string-equal)
+                 (member (elt str 1) *articles* :test #'string-equal))
              (setf *more* (string-upcase
-                           (concatenate 'string (elt str 0) " " (elt str 1)))))
-        (let ((str (nth-value 1 (scan-to-strings "(?i)more\\W+(\\w+)" s))))
+                           (concatenate 'string (elt str 0) " " (elt str 1)
+                                        " " (elt str 2)))))
+        (let ((str (nth-value 1 (scan-to-strings "(?i)more\\W+(\\w+)\\W+(\\w+)" s))))
           (or
-           (and str (setf *more* (string-upcase (elt str 0))))
-           )))))))
-
+           (and str
+                (or (member (elt str 0) *prepositions* :test #'string-equal)
+                    (member (elt str 0) *conjunctions* :test #'string-equal)
+                    (member (elt str 0) *articles* :test #'string-equal))
+                (setf *more* (string-upcase
+                              (concatenate 'string (elt str 0) " " (elt str 1)))))
+           (let ((str (nth-value 1 (scan-to-strings "(?i)more\\W+(\\w+)" s))))
+             (or
+              (and str (setf *more* (string-upcase (elt str 0))))
+              )))))))))
+    
 (defun cliki-lookup (term-with-question &key sender channel)
   (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2"))
         (should-send-cant-find t))
@@ -617,7 +621,7 @@
                    (if (scan "^(?i)version(\\s|!|\\?|\\.|$)*" first-pass)
                        (format nil "This is the minion bot, running on a ~A (~A) and running under ~A ~A." (machine-type) (machine-version) (lisp-implementation-type) (lisp-implementation-version)))
                    (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
-                   (if (scan "^(?i)chant$" first-pass)
+                   (if (scan "^(?i)chant(\\s|!|\\?|\\.|$)*" first-pass)
                        (format nil "MORE ~A" *more*))
                    (if (scan "^(?i)advice$" first-pass)
                        (random-advice))
