@@ -438,9 +438,9 @@ known."
 (defmethod remove-channel ((channel channel) (user user))
   "Remove `channel' from `user'."
   (warn 
-   (concat 'string 
-           "use of depricated API (remove-channel channel user): "
-           "(remove-channel user channel) is now preferred"))
+   (concatenate 'string 
+                "use of depricated API (remove-channel channel user): "
+                "(remove-channel user channel) is now preferred"))
   (remove-channel user channel))
 
 (defmethod remove-channel ((user user) (channel channel))
