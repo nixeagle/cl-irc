@@ -123,7 +123,7 @@ input."
   (let ((stream (server-stream connection)))
     (and (streamp stream)
          (open-stream-p stream))))
-  
+
 (defmethod read-message ((connection connection))
   (let ((read-more-p t))
     (handler-case
@@ -143,7 +143,7 @@ input."
   #+cmu (mp:make-process function :name name)
   #+lispworks (mp:process-run-function name nil function)
   #+sb-thread (sb-thread:make-thread function))
-  
+
 (defmethod start-background-message-handler ((connection connection))
   "Read messages from the `connection', parse them and dispatch
 irc-message-event on them. Returns background process ID if available."
@@ -189,7 +189,7 @@ server, via the `connection'."
 (defmethod get-hooks ((connection connection) (class symbol))
   "Return a list of all hooks for `class'."
   (gethash class (hooks connection)))
-        
+
 (defmethod add-hook ((connection connection) class hook)
   "Add `hook' to `class'."
   (setf (gethash class (hooks connection))
@@ -237,8 +237,7 @@ between the two users.")))
         (format stream "with ~A@~A"
                 (nickname (user object))
                 (hostname (user object)))
-                
-        "")))
+      "")))
 
 (defun make-dcc-connection (&key (user nil)
                                  (remote-address nil)
@@ -315,7 +314,7 @@ channel.  Rather, the number returned from the LIST command gets stuck
 in there so the user of this library can use it for searching
 channels, for instance.  If the value is NIL then the slot has not
 been populated by a LIST command.")))
-    
+
 (defmethod print-object ((object channel) stream)
   "Print the object for the Lisp reader."
   (print-unreadable-object (object stream :type t :identity t)
@@ -325,7 +324,7 @@ been populated by a LIST command.")))
   "Normalize `string' so that it represents an all-downcased channel
 name."
   (string-downcase string))
-  
+
 (defun make-channel (&key (name "")
                           (topic "")
                           (modes nil)
@@ -439,7 +438,7 @@ nickname."
 (defgeneric remove-all-users (connection))
 (defgeneric remove-user (object user))
 (defgeneric remove-user-everywhere (connection user))
-(defgeneric find-or-make-user (connection nickname 
+(defgeneric find-or-make-user (connection nickname
                                           &key username hostname realname))
 (defgeneric change-nickname (connection user new-nickname))
 
@@ -471,8 +470,8 @@ known."
 
 (defmethod remove-channel ((channel channel) (user user))
   "Remove `channel' from `user'."
-  (warn 
-   (concatenate 'string 
+  (warn
+   (concatenate 'string
                 "use of depricated API (remove-channel channel user): "
                 "(remove-channel user channel) is now preferred"))
   (remove-channel user channel))
@@ -576,7 +575,7 @@ may be already be on."
 		(symbol-name name)
 		"-"
 		(symbol-name '#:message))))
-  
+
 (defmacro define-irc-message (command)
   (let ((name (intern-message-symbol :irc command)))
     `(progn
