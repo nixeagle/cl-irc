@@ -20,7 +20,27 @@
 
    ((more (?* ?x))
     (?x me harder))
-   
+
+   ((what s the difference between (?* ?x) and (?* ?y))
+    (?x has similar features but longer hair)
+    (?y has similar features but longer hair))
+
+   ((what are the differences between (?* ?x) and (?* ?y))
+    (?x has similar features but longer hair)
+    (?y has similar features but longer hair))
+
+   ((what is the difference between (?* ?x) and (?* ?y))
+    (?x has similar features but longer hair)
+    (?y has similar features but longer hair))
+
+   ((the difference between (?* ?x) and (?* ?y))
+    (?x has similar features but longer hair)
+    (?y has similar features but longer hair))
+
+   ((the differences between (?* ?x) and (?* ?y))
+    (?x has similar features but longer hair)
+    (?y has similar features but longer hair))
+
    (((?* ?x) you (?* ?y) written (?* ?z))
     (|I'm| written in Common Lisp))
 
