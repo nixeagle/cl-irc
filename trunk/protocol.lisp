@@ -33,6 +33,10 @@
     :initarg :server-stream
     :accessor server-stream
     :documentation "Stream used to talk to the IRC server.")
+   (server-socket
+    :initarg :server-socket
+    :accessor server-socket
+    :initform nil)
    (client-stream
     :initarg :client-stream
     :accessor client-stream
@@ -76,12 +80,14 @@ this stream.")
 (defun make-connection (&key (user nil)
                              (server-name "")
                              (server-stream nil)
+			(server-socket nil)
                              (client-stream t)
                              (hooks nil))
   (let ((connection (make-instance 'connection
                                    :user user
                                    :server-name server-name
                                    :server-stream server-stream
+				   :server-socket server-socket
                                    :client-stream client-stream)))
     (dolist (hook hooks)
       (add-hook connection (car hook) (cadr hook)))
@@ -118,6 +124,12 @@ input."
     (and (streamp stream)
          (open-stream-p stream))))
 
+(define-condition invalidate-me (condition)
+  ((socket :initarg :socket
+           :reader invalidate-me-socket)
+   (condition :initarg :condition
+              :reader invalidate-me-condition)))
+
 (defmethod read-message ((connection connection))
   (let ((read-more-p t))
     (handler-case
@@ -128,7 +140,10 @@ input."
                 (format *debug-stream* "~A" (describe message)))
               (irc-message-event message)
               message))) ; needed because of the "loop while" in read-message-loop
-      (stream-error () (setf read-more-p nil)))))
+      (stream-error (c) (setf read-more-p nil)
+                    (signal 'invalidate-me :socket
+                            (server-socket connection)
+                            :condition c)))))
 
 (defvar *process-count* 0)
 
@@ -152,7 +167,13 @@ irc-message-event on them. Returns background process ID if available."
 			      (server-stream connection))
 			     :input (lambda (fd)
 				      (declare (ignore fd))
-				      (read-message connection))))))
+                                      (handler-case
+                                          (read-message connection)
+                                        (invalidate-me (c)
+                                          (sb-sys:invalidate-descriptor
+                                           (invalidate-me-socket c))
+                                          (format t "Socket closed: ~A~%"
+                                                  (invalidate-me-condition c)))))))))
 
 (defun stop-background-message-handler (process)
   "Stops a background message handler process returned by the start function."
