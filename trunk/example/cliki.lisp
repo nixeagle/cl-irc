@@ -504,7 +504,8 @@
                                         (:forward (elt (cdr strings) 1))
                                         (:backward (elt (cdr strings) 3))))
                                 (person (if (string-equal person "me")
-                                            (or sender channel "you")))
+                                            (or sender channel "you")
+                                            person))
                                 (about (cliki-lookup term :sender sender
                                                     :channel channel)))
                            (if about
