@@ -1,8 +1,8 @@
 $Id$
 $Source$
 
-A user's guide to net-nittin-irc.  The user is thought of as a Common
-Lisp programmer using the library in his own code.
+A user's guide to cl-irc.  The user is thought of as a Common Lisp
+programmer using the library in his own code.
 
   Introduction to IRC
 
@@ -13,7 +13,7 @@ Lisp programmer using the library in his own code.
 
   About this library
 
-    net-nittin-irc is an implementation of the client-side protocol.
+    cl-irc is an implementation of the client-side protocol.
     It is not impossible to add the server-side but it has simple not
     been done yet (and the current authors have no plans of doing so,
     although patches are certainly welcome).
@@ -48,7 +48,7 @@ Lisp programmer using the library in his own code.
 
   An example
 
-    * (require :net-nittin-irc)
+    * (require :cl-irc)
 
     * (in-package :irc)
 
@@ -74,4 +74,4 @@ Lisp programmer using the library in his own code.
 
   Feedback
 
-    Please direct any feedback to net-nittin-irc-devel@common-lisp.net
+    Please direct any feedback to cl-irc-devel@common-lisp.net
