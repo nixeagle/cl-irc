@@ -477,7 +477,7 @@
                 (progn
                   (setf first-pass (regex-replace-all "(:|/|\\\\|\\#)" first-pass ""))
                   (setf first-pass (regex-replace-all "^(?i)(.*[^, ])(,|)\\s*please$" first-pass "\\1"))
-                  (setf first-pass (regex-replace-all "^(?i)please(,|)\\s*(.*[^, ])$" first-pass "\\1"))
+                  (setf first-pass (regex-replace-all "^(?i)please(,|)\\s*(.*[^, ])$" first-pass "\\2"))
                   (when (and (scan "^(?i)lisppaste(\\s|!|\\?|\\.|$)*" first-pass)
                              (find-package :lisppaste)
                              channel
@@ -490,7 +490,7 @@
                    (let ((strings
                           (or
                            (aif
-                            (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach)\\s+(\\S+)\\s+(about|on|in|to|through|for|)\\s*(.+)$" first-pass))
+                            (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach|give)\\s+(\\S+)\\s+(about|on|in|to|through|for|some|)\\s*(.+)$" first-pass))
                             (cons :forward it))
                            (aif
                             (nth-value 1 (scan-to-strings "^(?i)(look\\s+up\\s+|)\\s*(.+)\\s+(for|to|at)\\s+(\\S+)$" first-pass))
@@ -597,16 +597,16 @@
                                       (or sender channel "you")
                                       (elt str 1))
                                   (random-advice))))
-                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(for\\s+|)(\\S+)\\s+(on|about)\\s+(.+)$" first-pass))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)(any\\s+|some\\s+|)advi[cs]e\\s+(for\\s+|)(\\S+)\\s+(on|about)\\s+(.+)$" first-pass))))
                      (and str
                           (format nil "~A: ~A"
-                                  (if (string-equal (elt str 1) "me")
+                                  (if (string-equal (elt str 2) "me")
                                       (or sender channel "you")
-                                      (elt str 1))
-                                  (search-advice (elt str 3)))))
-                   (let ((str (nth-value 1 (scan-to-strings "^(?i)advi[cs]e\\s+(on|about)\\s+(.+)$" first-pass))))
+                                      (elt str 2))
+                                  (search-advice (elt str 4)))))
+                   (let ((str (nth-value 1 (scan-to-strings "^(?i)(any\\s+|some\\s+|)advi[cs]e\\s+(on|about)\\s+(.+)$" first-pass))))
                      (and str
-                          (search-advice (elt str 1))))
+                          (search-advice (elt str 2))))
                    (let ((str (nth-value 1 (scan-to-strings "^(?i)advice\\W+(\\d+)$" first-pass))))
                      (and str
                           (lookup-advice (elt str 0))))
