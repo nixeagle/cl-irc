@@ -487,42 +487,7 @@
                                       channel))
                     (return-from cliki-lookup nil))
                   (or
-                   (let ((strings
-                          (or
-                           (aif
-                            (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach|give)\\s+(\\S+)\\s+(about|on|in|to|through|for|some|)\\s*(.+)$" first-pass))
-                            (cons :forward it))
-                           (aif
-                            (nth-value 1 (scan-to-strings "^(?i)(look\\s+up\\s+|)\\s*(.+)\\s+(for|to|at)\\s+(\\S+)$" first-pass))
-                            (cons :backward it))
-                           )))
-                     (if strings
-                         (let* ((term (case (car strings)
-                                        (:forward (elt (cdr strings) 3))
-                                        (:backward (elt (cdr strings) 1))))
-                                (person (case (car strings)
-                                        (:forward (elt (cdr strings) 1))
-                                        (:backward (elt (cdr strings) 3))))
-                                (person (if (string-equal person "me")
-                                            (or sender channel "you")
-                                            person))
-                                (about (cliki-lookup term :sender sender
-                                                    :channel channel)))
-                           (if about
-                               (format nil "~A: ~A~A"
-                                       person
-                                       (if (scan "http:" about)
-                                           (concatenate 'string
-                                                        (random-element
-                                                         '("have a look at"
-                                                           "please look at"
-                                                           "please see"
-                                                           "direct your attention towards"
-                                                           "look at"))
-                                                        " ")
-                                           "")
-                                       about)
-                               (setf should-send-cant-find nil)))))
+                   
                    (if (string-equal first-pass "help")
                        (if (should-do-lookup first-pass (or channel sender ""))
                            (progn
@@ -575,7 +540,42 @@
                    (let ((strs (nth-value 1 (scan-to-strings "^(?i)paste\\s+(\\d+)$" first-pass))))
                      (and strs
                           (lookup-paste (parse-integer (elt strs 0)))))
-                   
+                   (let ((strings
+                          (or
+                           (aif
+                            (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach|give)\\s+(\\S+)\\s+(about|on|in|to|through|for|some|)\\s*(.+)$" first-pass))
+                            (cons :forward it))
+                           (aif
+                            (nth-value 1 (scan-to-strings "^(?i)(look\\s+up\\s+|)\\s*(.+)\\s+(for|to|at)\\s+(\\S+)$" first-pass))
+                            (cons :backward it))
+                           )))
+                     (if strings
+                         (let* ((term (case (car strings)
+                                        (:forward (elt (cdr strings) 3))
+                                        (:backward (elt (cdr strings) 1))))
+                                (person (case (car strings)
+                                        (:forward (elt (cdr strings) 1))
+                                        (:backward (elt (cdr strings) 3))))
+                                (person (if (string-equal person "me")
+                                            (or sender channel "you")
+                                            person))
+                                (about (cliki-lookup term :sender sender
+                                                    :channel channel)))
+                           (if about
+                               (format nil "~A: ~A~A"
+                                       person
+                                       (if (scan "http:" about)
+                                           (concatenate 'string
+                                                        (random-element
+                                                         '("have a look at"
+                                                           "please look at"
+                                                           "please see"
+                                                           "direct your attention towards"
+                                                           "look at"))
+                                                        " ")
+                                           "")
+                                       about)
+                               (setf should-send-cant-find nil)))))
                    (if (scan "^(?i)hello(\\s|$)*" first-pass) "what's up?")
                    (if (scan "^(?i)hi(\\s|$)*" first-pass) "what's up?")
                    (if (scan "^(?i)yo(\\s|$)*" first-pass) "what's up?")
