@@ -26,9 +26,10 @@ objects in sync."))
         (realname (trailing-argument message))
         (username (third (arguments message)))
         (hostname (fourth (arguments message))))
-    (setf (realname user) realname)
-    (setf (username user) username)
-    (setf (hostname user) hostname)))
+    (when user
+      (setf (realname user) realname)
+      (setf (username user) username)
+      (setf (hostname user) hostname))))
 
 (defmethod default-hook ((message irc-rpl_list-message))
   (let ((connection (connection message))
