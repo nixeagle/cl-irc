@@ -109,12 +109,13 @@
              (member to-lookup '("help" "help?") :test #'string-equal))
         (progn
           (privmsg *connection* destination
-                   (format nil "To use the ~A bot, say something like \"database term\", where database is one of (~{~S~^, ~}) and term is the desired lookup."
+                   (format nil "To use the ~A bot, say something like \"database term\", where database is one of (~{~S~^, ~}) and term is the desired lookup. The available databases are:"
                            *nickname*
                            (mapcar #'second *spec-providers*)))
-          (privmsg *connection* destination
-                   (format nil "The available databases are: ~{~{~*~S, ~A~}~^; ~}"
-                           *spec-providers*)))
+          (loop for (a b c d) on *spec-providers* by #'cddddr
+	       do (privmsg *connection* destination
+			   "~@{~{~*~S, ~A~}~}~}" a b c d))
+	  )
         (loop for type in *spec-providers*
               for actual-fun = (if (typep (first type) 'symbol)
                                    (first type)
