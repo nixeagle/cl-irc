@@ -12,8 +12,8 @@
 
 (defsystem cl-irc
     :name "cl-irc"
-    :author "Erik Enge"
-    :version "0.1.0"
+    :author "Erik Enge & Contributors"
+    :version "0.5.2"
     :licence "MIT"
     :description "Common Lisp interface to the IRC protocol"
     :depends-on
