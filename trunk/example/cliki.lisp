@@ -182,11 +182,6 @@
     (or (cddr (assoc num *advice-db*))
         "You can't just make up advice numbers and expect a response.")))
 
-(defun fix-advice ()
-  (mapc #'(lambda (e)
-            (setf (cdr e)
-                  (cddr e))) *advice-db*))
-
 (defun random-advice ()
   (let ((item (random-element *advice-db*)))
     (format nil "#~A: ~A" (car item) (cdr item))))
