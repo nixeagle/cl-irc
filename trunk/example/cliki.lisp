@@ -9,8 +9,9 @@
 
 (defpackage :cliki (:use :common-lisp :irc :cl-ppcre)
   (:export :start-cliki-bot :*cliki-nickserv-password*
-	   :*respond-to-general-hellos*))
+	   :*respond-to-general-hellos* :shut-up :un-shut-up))
 (in-package :cliki)
+
 
 (defvar *small-definitions* nil)
 
@@ -163,6 +164,13 @@
 
 (defvar *cliki-connection*)
 (defvar *cliki-nickname*)
+
+(defun shut-up ()
+  (setf (irc:client-stream *cliki-connection*) (make-broadcast-stream)))
+
+(defun un-shut-up ()
+  (setf (irc:client-stream *cliki-connection*) *trace-output*))
+
 
 (defmacro aif (test conseq &optional (else nil))
   `(let ((it ,test))
