@@ -61,6 +61,22 @@ this stream.")
   (print-unreadable-object (object stream :type t :identity t)
     (princ (server-name object) stream)))
 
+(defgeneric add-default-hooks (connection))
+(defgeneric client-raw-log (connection message))
+(defgeneric connectedp (connection))
+(defgeneric read-message (connection))
+(defgeneric start-process (function name))
+(defgeneric start-background-message-handler (connection))
+(defgeneric read-message-loop (connection))
+(defgeneric read-irc-message (connection))
+(defgeneric send-irc-message (connection command
+                             &optional trailing-argument &rest arguments))
+(defgeneric get-hooks (connection class))
+(defgeneric add-hook (connection class hook))
+(defgeneric remove-hook (connection class hook))
+(defgeneric remove-hooks (connection class))
+(defgeneric remove-all-hooks (connection))
+
 (defun make-connection (&key (user nil)
                              (server-name "")
                              (server-socket nil)
@@ -239,6 +255,9 @@ between the two users.")))
   #-sbcl
   (warn "make-dcc-connection not supported for this implementation."))
 
+(defgeneric dcc-close (connection))
+(defgeneric send-dcc-message (connection message))
+
 (defmethod read-message ((connection dcc-connection))
   (let ((message (read-line (dcc-stream connection))))
     (format (output-stream connection) "~A~%" message)
@@ -322,6 +341,12 @@ name."
     (dolist (user users)
       (add-user channel user))
     channel))
+
+(defgeneric find-channel (connection channel))
+(defgeneric remove-all-channels (connection))
+(defgeneric add-channel (connection channel))
+(defgeneric remove-channel (connection channel))
+(defgeneric remove-users (channel))
 
 (defmethod find-channel ((connection connection) (channel string))
   "Return channel as designated by `channel'.  If no such channel can
@@ -408,6 +433,15 @@ nickname."
          (new-string (substitute #\\ #\| new-string))
          (new-string (substitute #\~ #\^ new-string)))
     (string-downcase new-string)))
+
+(defgeneric find-user (connection nickname))
+(defgeneric add-user (object user))
+(defgeneric remove-all-users (connection))
+(defgeneric remove-user (object user))
+(defgeneric remove-user-everywhere (connection user))
+(defgeneric find-or-make-user (connection nickname 
+                                          &key username hostname realname))
+(defgeneric change-nickname (connection user new-nickname))
 
 (defmethod find-user ((connection connection) (nickname string))
   "Return user as designated by `nickname' or nil if no such user is
@@ -521,6 +555,11 @@ may be already be on."
   (print-unreadable-object (object stream :type t :identity t)
     (format stream "~A ~A" (source object) (command object))))
 
+(defgeneric self-message-p (message))
+(defgeneric find-irc-message-class (type))
+(defgeneric client-log (connection message &optional prefix))
+(defgeneric apply-to-hooks (message))
+
 (defmethod self-message-p ((message irc-message))
   "Did we send this message?"
   (string-equal (source message)
@@ -551,7 +590,8 @@ may be already be on."
     (eval (list 'define-irc-message class)))) ; argh.  eval.
 
 ;; should perhaps wrap this in an eval-when?
-(create-irc-message-classes (mapcar #'second *reply-names*))
+(create-irc-message-classes (remove-duplicates
+                             (mapcar #'second *reply-names*)))
 (create-irc-message-classes '(:privmsg :notice :kick :topic :error
                               :mode :ping :nick :join :part :quit :kill
 			      :pong :invite))
@@ -585,6 +625,8 @@ may be already be on."
     :accessor ctcp-command)))
 
 (defclass standard-ctcp-message (ctcp-mixin message) ())
+
+(defgeneric find-ctcp-message-class (type))
 
 (defmacro define-ctcp-message (ctcp-command)
   (let ((name (intern-message-symbol :ctcp ctcp-command)))

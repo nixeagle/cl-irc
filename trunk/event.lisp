@@ -14,6 +14,12 @@ message."))
   (apply-to-hooks message)
   (client-log (connection message) message "UNHANDLED-EVENT:"))
 
+
+(defgeneric default-hook (message)
+  (:documentation "Minimum action to be executed upon reception
+of the IRC message to keep the connection, channel and user
+objects in sync."))
+
 (defmethod default-hook ((message irc-rpl_whoisuser-message))
   (let ((user (find-user (connection message)
                          (second (arguments message))))
