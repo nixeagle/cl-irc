@@ -352,7 +352,7 @@
 
 
 (defun make-cliki-attention-prefix (nick)
-  (format nil "^~A[,:]\\s+" nick))
+  (format nil "^(?i)~A[,:]\\s+" nick))
 
 (defvar *cliki-attention-prefix* "")
 
