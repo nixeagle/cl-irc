@@ -132,3 +132,22 @@ returned."
             (values end-position
                     (subseq string cut-from end-position))
             (values start nil)))))
+
+(defun cut-before (string substring end-chars &key (start 0) (cut-extra t))
+  "Cut `string' before `substring' or any of the `end-chars', from `start'.
+
+If `cut-extra' is t, we will cut from start + 1 instead of just
+`start'.
+
+When there is no string matching the input parameters `start' and nil
+will be returned, otherwise `end-position' and the string are
+returned."
+  (let ((end-position (or (search substring string :start2 (1+ start))
+                          (position-if #'(lambda (x)
+                                           (member x end-chars))
+                                       string :start (1+ start))))
+        (cut-from (if cut-extra (1+ start) start)))
+    (if end-position
+        (values end-position
+                (subseq string cut-from end-position))
+      (values start nil))))

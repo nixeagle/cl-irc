@@ -33,7 +33,9 @@
     (2 :rpl_yourhost)
     (3 :rpl_created)
     (4 :rpl_myinfo)
-    (5 :rpl_bounce)
+    (5 :rpl_isupport) ;; The RFC was wrong to define RPL_BOUNCE here,
+     ;; see http://www.irc.org/tech_docs/draft-brocklesby-irc-isupport-03.txt
+    (10 :rpl_bounce)
     (200 :rpl_tracelink)
     (201 :rpl_traceconnecting)
     (202 :rpl_tracehandshake)
