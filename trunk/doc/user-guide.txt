@@ -46,6 +46,35 @@ programmer using the library in his own code.
     message object) with `add-hook' and it will be called the next
     time the library receives a message for your connection.
 
+  Modes
+
+    The library tracks modes and mode changes for channels and users
+    and sets mode fields accordingly.  To manipulate modes, use:
+
+      - add-mode
+      - remove-mode
+      - has-mode-p
+      - has-mode-value-p
+      - set-mode
+      - unset-mode
+
+    on objects of class `user' or `channel'.  Note that these only change
+    local state.  You'll need to use the `mode' method to send mode
+    changes over the network.
+
+    The library translates modes from the network (designated by
+    characters) to keywords.  These keywords are then used as the
+    `mode-name' argument for the above methods.  Any value can be used
+    as a mode name when introducing custom modes.
+
+    Modes which take on `on' or `off' values, like the `a' user
+    mode (away), return `nil' for `has-mode-value-p' to signal `off' and
+    `t' to signal `on'.
+
+    Applications which want to track their own modes need to append
+    the return value from the `make-mode-description' function to either
+    the channel-mode-descriptions or user-mode-descriptions field.
+
   An example
 
     * (require :cl-irc)

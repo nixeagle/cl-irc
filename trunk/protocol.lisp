@@ -16,6 +16,74 @@
   (:report (lambda (condition stream)
              (format stream "No such reply ~A." (reply-number condition)))))
 
+
+
+;;
+;; Modes
+;;
+
+;; generic abstract mode class
+
+(defclass irc-mode ()
+  ((value
+    :initarg :value
+    :accessor value
+    :initform nil)
+   (value-type
+    :initarg :value-type
+    :accessor value-type
+    :documentation "The framework sets this to `:user' or `:non-user'.
+Essentially, if it's `:user', the value(s) held must be derived from the
+user class.")))
+
+(defgeneric set-mode-value (mode-object value))
+(defgeneric unset-mode-value (mode-object value))
+(defgeneric reset-mode-value (mode-object))
+(defgeneric has-value-p (mode-object value &key key test))
+
+(defmethod reset-mode-value ((mode irc-mode))
+  (setf (value mode) nil))
+
+
+;; mode class for holding single values
+
+(defclass single-value-mode (irc-mode) ())
+
+(defmethod set-mode-value ((mode single-value-mode) value)
+  (setf (value mode) (or value t)))
+
+(defmethod unset-mode-value ((mode single-value-mode) value)
+  (when (or (null value)
+            (equal value (value mode)))
+    (setf (value mode) nil)))
+
+(defmethod has-value-p ((mode single-value-mode) value
+                        &key (key #'identity) (test #'equal))
+  (funcall test
+           (funcall key (value mode))
+           (funcall key value)))
+
+
+;; mode class for holding lists of values
+
+(defclass list-value-mode (irc-mode) ())
+
+(defmethod set-mode-value ((mode list-value-mode) value)
+  (push value (value mode)))
+
+(defmethod unset-mode-value ((mode list-value-mode) value)
+  (setf (value mode)
+        (remove value (value mode))))
+
+(defmethod has-value-p ((mode list-value-mode) value
+                        &key (key #'identity) (test #'equal))
+  (let ((key-value (funcall key value)))
+    (some #'(lambda (x)
+              (funcall test
+                       key-value
+                       (funcall key x)))
+          (value mode))))
+
 ;;
 ;; Connection
 ;;
@@ -52,6 +120,25 @@ this stream.")
     :initarg :hooks
     :accessor hooks
     :initform (make-hash-table :test #'equal))
+   (channel-mode-descriptions
+    :initarg :channel-mode-descriptions
+    :accessor channel-mode-descriptions
+    :initform (chanmode-descs-from-isupport *default-isupport-values*)
+    :documentation
+    "Describes the modes an application intends to register with channels.")
+   (nick-prefixes
+    :initarg :nick-prefixes
+    :accessor nick-prefixes
+    :initform (nick-prefixes-from-isupport *default-isupport-values*))
+   (user-mode-destriptions
+    :initarg :user-mode-descriptions
+    :accessor user-mode-descriptions
+    :initform (mapcar #'(lambda (x)
+                          (make-mode-description :char (car x)
+                                                 :symbol (cdr x)))
+                      *char-to-user-modes-map*)
+    :documentation
+    "Describes the modes an application intends to register with channels.")
    (users
     :initarg :users
     :accessor users
@@ -108,6 +195,7 @@ this stream.")
                      irc-quit-message
                      irc-kick-message
                      irc-nick-message
+                     irc-mode-message
                      ctcp-time-message
                      ctcp-source-message
                      ctcp-finger-message
@@ -365,7 +453,7 @@ between the two users.")))
    (modes
     :initarg :modes
     :accessor modes
-    :initform nil)
+    :initform '())
    (users
     :initarg :users
     :accessor users
@@ -414,6 +502,47 @@ name."
 (defgeneric remove-channel (connection channel))
 (defgeneric remove-users (channel))
 
+(defgeneric mode-name-from-char (connection target mode-char)
+  (:documentation "Map the mode character used in the MODE message to a
+symbol used internally to describe the mode given a `target'."))
+
+(defgeneric mode-description (connection target mode-name)
+  (:documentation "Retrieve a `mode-description' structure for the given
+`mode-name' keyword."))
+
+(defgeneric get-mode (target mode)
+  (:documentation "Get the value associated with `mode' for `target'
+or `nil' if no mode available."))
+
+(defgeneric set-mode (target mode &optional parameter)
+  (:documentation "Set the mode designated by the `mode' keyword to a
+value passed in `parameter' or T if `parameter' is absent."))
+
+(defgeneric unset-mode (target mode &optional parameter)
+  (:documentation
+"Sets value of the mode designated by the `mode' keyword to nil.
+If the mode holds a list of values `parameter' is used to indicate which
+element to remove."))
+
+(defgeneric add-mode (target mode-name mode)
+  (:documentation "Add the mode-holding object `mode-value' to `target'
+under the access key `mode-name'.
+
+If mode-value is a subtype of irc-mode, it is added as-is.
+Otherwise, a mode-object will be generated from the "))
+(defgeneric remove-mode (target mode-name)
+  (:documentation "Remove the mode-holding object in the `mode-name' key
+from `target'."))
+
+(defgeneric has-mode-p (target mode)
+  (:documentation "Return a generalised boolean indicating if `target' has
+a mode `mode' associated with it."))
+
+(defgeneric has-mode-value-p (target mode value &key key test)
+  (:documentation "Return a generalised boolean indicating if `target' has
+a mode `mode' associated with the value `value' for given a `key' transform
+and `test' test."))
+
 (defmethod find-channel ((connection connection) (channel string))
   "Return channel as designated by `channel'.  If no such channel can
 be found, return nil."
@@ -434,7 +563,68 @@ be found, return nil."
 
 (defmethod remove-users ((channel channel))
   "Remove all users on `channel'."
-  (clrhash (users channel)))
+  (clrhash (users channel))
+  (do-property-list (prop val (modes channel))
+     (when (and val (eq (value-type val) :user))
+       (remf (modes channel) prop))))
+
+(defmethod mode-name-from-char ((connection connection)
+                                (target channel) mode-char)
+  (declare (ignore target))
+  (let ((mode-desc (find mode-char (channel-mode-descriptions connection)
+                         :key #'mode-desc-char)))
+    (when mode-desc
+      (mode-desc-symbol (the mode-description mode-desc)))))
+
+(defmethod mode-description ((connection connection)
+                             (target channel) mode-name)
+  (declare (ignore target))
+  (find mode-name (channel-mode-descriptions connection)
+        :key #'mode-desc-symbol))
+
+(defgeneric make-mode (connection target mode-id))
+
+(defmethod make-mode (connection target (mode character))
+  (let ((mode-name (mode-name-from-char connection target mode)))
+    (make-mode connection target mode-name)))
+
+(defmethod make-mode (connection target (mode symbol))
+  (let ((mode-desc (mode-description connection target mode)))
+    (make-instance (mode-desc-class mode-desc)
+                   :value-type (if (mode-desc-nick-param-p mode-desc)
+                                   :user :non-user))))
+
+(defmethod add-mode (target mode-name mode)
+  (setf (getf (modes target) mode-name) mode))
+
+(defmethod remove-mode (target mode-name)
+  (remf (modes target) mode-name))
+
+(defmethod get-mode (target mode)
+  (let ((mode-object (has-mode-p target mode)))
+    (when mode-object
+      (value mode-object))))
+
+(defmethod set-mode (target mode &optional parameter)
+  (set-mode-value (getf (modes target) mode) parameter))
+
+(defmethod unset-mode (target mode &optional parameter)
+  (let ((mode (getf (modes target) mode)))
+    (when mode
+      (unset-mode-value mode parameter))))
+
+(defmethod has-mode-p (target mode)
+  (multiple-value-bind
+      (indicator value tail)
+      (get-properties (modes target) (list mode))
+    (when (or indicator value tail)
+      value)))
+
+(defmethod has-mode-value-p (target mode value
+                                    &key (key #'identity) (test #'equal))
+  (let ((mode (getf (modes target) mode)))
+    (when mode
+      (has-value-p mode value :key key :test test))))
 
 ;;
 ;; User
@@ -461,6 +651,10 @@ be found, return nil."
     :initarg :realname
     :accessor realname
     :initform "")
+   (modes
+    :initarg :modes
+    :accessor modes
+    :initform '())
    (channels
     :initarg :channels
     :accessor channels
@@ -534,7 +728,10 @@ known."
 (defmethod remove-user ((channel channel) (user user))
   "Remove `user' from `channel' and `channel' from `user'."
   (remhash (normalized-nickname user) (users channel))
-  (setf (channels user) (remove channel (channels user))))
+  (setf (channels user) (remove channel (channels user)))
+  (do-property-list (prop val (modes channel))
+     (when (and val (eq (value-type val) :user))
+       (unset-mode channel prop user))))
 
 (defmethod remove-channel ((channel channel) (user user))
   "Remove `channel' from `user'."
@@ -558,6 +755,20 @@ may be already be on."
   (dolist (channel (channels user))
     (remove-user channel user))
   (remove-user connection user))
+
+(defmethod mode-name-from-char ((connection connection)
+                                (target user) mode-char)
+  (declare (ignore target))
+  (let ((mode-desc (find mode-char (user-mode-descriptions connection)
+                         :key #'mode-desc-char)))
+    (when mode-desc
+      (mode-desc-symbol (the mode-description mode-desc)))))
+
+(defmethod mode-description ((connection connection)
+                             (target user) mode-name)
+  (declare (ignore target))
+  (find mode-name (user-mode-descriptions connection)
+        :key #'mode-desc-symbol))
 
 (defmethod find-or-make-user ((connection connection) nickname &key (username "")
                               (hostname "") (realname ""))

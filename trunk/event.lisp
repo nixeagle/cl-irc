@@ -31,15 +31,12 @@ objects in sync."))
                                               (list (subseq x 0 eq-pos)
                                                     (subseq x (1+ eq-pos)))
                                             (list x)))) capabilities)))
-            (mapcar #'(lambda (x)
-                        (or (assoc x new-values :test #'string=)
-                            (assoc x *default-isupport-values*
-                                   :test #'string=)))
-                    (remove-duplicates
-                     (mapcar #'first (append new-values
-                                             *default-isupport-values*))
-                             :test #'string=))))
-
+            (merge 'list new-values (copy-seq *default-isupport-values*)
+                   #'string= :key #'first)))
+    (setf (channel-mode-descriptions connection)
+          (chanmode-descs-from-isupport (server-capabilities connection))
+          (nick-prefixes connection)
+          (nick-prefixes-from-isupport (server-capabilities connection)))
     (when (not (equal current-case-mapping
                       (case-map-name connection)))
       ;; we need to re-normalize nicks and channel names
@@ -81,7 +78,19 @@ objects in sync."))
                                                             nickname))))
         (unless (equal user (user connection))
           (add-user connection user)
-          (add-user channel user))))))
+          (add-user channel user))
+        (let* ((mode-char (getf (nick-prefixes connection)
+                                (elt nickname 0)))
+               (mode-name (when mode-char
+                            (mode-name-from-char connection
+                                                 channel mode-char))))
+          (when mode-name
+            (if (has-mode-p channel mode-name)
+                (set-mode channel mode-name user)
+              (set-mode-value (add-mode channel mode-name
+                                        (make-mode connection
+                                                   channel mode-name))
+                              user))))))))
 
 (defmethod default-hook ((message irc-ping-message))
   (pong (connection message) (trailing-argument message)))
@@ -118,6 +127,27 @@ objects in sync."))
 (defmethod default-hook ((message irc-quit-message))
   (let ((connection (connection message)))
     (remove-user-everywhere connection (find-user connection (source message)))))
+
+(defmethod default-hook ((message irc-mode-message))
+  (destructuring-bind
+      (target &rest arguments)
+      (arguments message)
+    (let* ((connection (connection message))
+           (target (or (find-channel connection target)
+                       (find-user connection target)))
+           (mode-changes
+            (when target
+              (parse-mode-arguments connection target arguments
+                                     :server-p (user connection)))))
+      (dolist (change mode-changes)
+        (destructuring-bind
+            (op mode-name value)
+            change
+          (unless (has-mode-p target mode-name)
+            (add-mode target mode-name
+                      (make-mode connection target mode-name)))
+          (funcall (if (char= #\+ op) #'set-mode #'unset-mode)
+                   target mode-name value))))))
 
 (defmethod default-hook ((message irc-nick-message))
   (let ((con (connection message)))

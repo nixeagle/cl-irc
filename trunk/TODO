@@ -1,6 +1,4 @@
 
-  - Modes needs to be updated for users and channels.
-
   - Add DCC
 
     - I would really like usocket first
@@ -19,3 +17,6 @@
 
   - When doing a whois on a user the library ought to snap up the
   channels in WHOISCHANNELS as channels the user is currently on.
+
+  - Extend the mode tracking and isupport frameworks to detect server
+  type and adjust mode-name maps accordingly.

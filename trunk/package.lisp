@@ -18,6 +18,17 @@
              :send-message
              :server-name
              :no-such-reply
+             :irc-mode
+             :single-value-mode
+             :list-value-mode
+             :add-mode
+             :remove-mode
+             :has-mode-p
+             :has-mode-value-p
+             :get-mode
+             :set-mode
+             :unset-mode
+             :parse-mode-arguments
              :parse-raw-message
              :normalize-nickname
              :normalize-channel-name

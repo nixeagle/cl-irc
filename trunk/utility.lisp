@@ -157,6 +157,85 @@ returned."
                     (subseq string cut-from end-position))
           (values start nil))))))
 
+(defun parse-isupport-prefix-argument (prefix)
+  (declare (type string prefix))
+  (let ((closing-paren-pos (position #\) prefix)))
+    (when (and (eq (elt prefix 0) #\( )
+               closing-paren-pos)
+      (let ((prefixes (subseq prefix (1+ closing-paren-pos)))
+            (modes (subseq prefix 1 closing-paren-pos)))
+        (when (= (length prefixes)
+                 (length modes))
+          (values prefixes modes))))))
+
+(defun nick-prefixes-from-isupport (isupport-arguments)
+  "Returns an assoc list associating prefix characters with mode characters."
+  (multiple-value-bind
+      (prefixes modes)
+      (parse-isupport-prefix-argument (second (assoc "PREFIX"
+                                                     isupport-arguments
+                                                     :test #'string=)))
+    (let ((rv))
+      (dotimes (i (length modes)
+                  rv)
+        (setf (getf rv (char prefixes i))
+              (char modes i))))))
+
+(defun chanmode-descs-from-isupport (isupport-arguments
+                                     &optional
+                                     (mode-symbols
+                                      *default-char-to-channel-modes-map*))
+  "Parses a string describing channel modes conforming to
+http://www.irc.org/tech_docs/draft-brocklesby-irc-isupport-03.txt
+paragraph 3.3.
+
+It returns a list of mode-description records."
+  (let* ((mode-desc-recs)
+         (pref (second (assoc "PREFIX" isupport-arguments :test #'string=)))
+         (chanmodes (second (assoc "CHANMODES" isupport-arguments
+                                   :test #'string=)))
+         (modes-list
+          (cons (second (multiple-value-list
+                         (parse-isupport-prefix-argument pref)))
+                (split-sequence:split-sequence #\, chanmodes)))
+         (mode-descs '(;; B type mode from PREFIX with nick argument
+                       (t t t list-value-mode)
+                       ;; A type mode
+                       (:optional-for-server
+                        :optional-for-server nil list-value-mode)
+                       ;; B type mode from CHANMODES
+                       (t   t   nil single-value-mode)
+                       ;; C type mode from CHANMODES
+                       (t   nil nil single-value-mode)
+                       ;; D type mode from CHANMODES
+                       (nil nil nil single-value-mode))))
+    (do ((mode (pop modes-list) (pop modes-list))
+         (mode-desc (pop mode-descs) (pop mode-descs)))
+        ((null mode-desc) mode-desc-recs)
+      (when (< 0 (length mode))
+        (let ((mode-struct
+               (make-mode-description :param-on-set-p (first mode-desc)
+                                      :param-on-unset-p (second mode-desc)
+                                      :nick-param-p (third mode-desc)
+                                      :class (fourth mode-desc))))
+          (dotimes (j (length mode))
+            (let ((mode-rec (copy-structure mode-struct))
+                  (mode-char (elt mode j)))
+              (setf (mode-desc-char mode-rec) mode-char
+                    (mode-desc-symbol mode-rec) (cdr (assoc mode-char
+                                                            mode-symbols)))
+              (push mode-rec mode-desc-recs))))))))
+
+(defmacro do-property-list ((prop val list) &body body)
+  (let ((lsym (gensym)))
+    `(let ((,lsym ,list))
+       (do* ((,prop (pop ,lsym) (pop ,lsym))
+             (,val (pop ,lsym) (pop ,lsym)))
+           ((and (null ,lsym)
+                 (null ,prop)
+                 (null ,val)))
+         ,@body))))
+
 (defgeneric irc-string-downcase (map-name string &key start end))
 
 (defmethod irc-string-downcase (map-name
@@ -173,19 +252,50 @@ returned."
   (declare (ignore map-name))
   (string-downcase string :start start :end end))
 
-(defun parse-isupport-prefix-argument (prefix)
-  (declare (type string prefix))
-  (let ((closing-paren-pos (position #\) prefix)))
-    (when (and (eq (elt prefix 0) #\( )
-               closing-paren-pos)
-      (let ((prefixes (subseq prefix (1+ closing-paren-pos)))
-            (modes (subseq prefix 1 closing-paren-pos)))
-        (when (= (length prefixes)
-                 (length modes))
-          (values prefixes modes))))))
-
 (defun parse-isupport-multivalue-argument (argument)
   (declare (type string argument))
   (mapcar #'(lambda (x)
               (split-sequence:split-sequence #\: x))
           (split-sequence:split-sequence #\, argument)))
+
+(defun parse-mode-arguments (connection target arguments &key server-p)
+  "Create a list of mode changes with their arguments for `target'
+   from `mode-string' and `arguments'.
+
+   Throw nil to the UNKNOWN-MODE symbol if any of the mode chars are unknown."
+  (catch 'illegal-mode-spec
+    (if (and (= 1 (length arguments))
+             (null (position (char (first arguments) 0) "+-")))
+        ;; type 1 mode specification; only allowed on servers
+        (when server-p
+          (let ((ops)
+                (arg (car arguments)))
+            (dotimes (i (length arg) (reverse ops))
+              (push (char arg i) ops))))
+      ;; type 2 mode specification; clients and servers
+      (let ((ops))
+        (do ((changes (pop arguments) (pop arguments)))
+            ((null changes) (values ops nil))
+          (let* ((this-op (char changes 0))
+                 (modes (subseq changes 1))
+                 (param-req (if (char= this-op #\+)
+                                #'mode-desc-param-on-set-p
+                              #'mode-desc-param-on-unset-p)))
+            (unless (position this-op "+-")
+              (throw 'illegal-mode-spec nil))
+            (dotimes (i (length modes))
+              (let* ((mode-rec
+                      (mode-description connection target
+                                        (mode-name-from-char connection target
+                                                             (char modes i))))
+                     (param-p (funcall param-req mode-rec)))
+                (when (and param-p
+                           (= 0 (length arguments)))
+                  (throw 'illegal-mode-spec nil))
+                (push (list this-op
+                            (mode-desc-symbol mode-rec)
+                            (when param-p
+                              (if (mode-desc-nick-param-p mode-rec)
+                                  (find-user connection (pop arguments))
+                                (pop arguments)))) ops)))))))))
+

@@ -26,17 +26,65 @@
 (defvar *default-quit-message*
   "Common Lisp IRC library - http://common-lisp.net/project/cl-irc")
 
+(defparameter *default-isupport-CHANMODES*
+  "beI,kO,l,aimnpqsrt")
+(defparameter *default-isupport-PREFIX*
+  "(ov)@+")
+
 (defparameter *default-isupport-values*
-  '(("CASEMAPPING" "rfc1459")
+  `(("CASEMAPPING" "rfc1459")
+    ("CHANMODES" ,*default-isupport-CHANMODES*)
     ("CHANNELLEN" "200")
     ("CHANTYPES" "#&")
     ("MODES" "3")
     ("NICKLEN" "9")
-    ("PREFIX" "(ov)@+")
+    ("PREFIX" ,*default-isupport-PREFIX*)
     ("TARGMAX")))
 
 
 (defvar *dcc-connections* nil)
+
+(defstruct (mode-description (:conc-name "MODE-DESC-"))
+  (char nil)
+  (symbol nil)
+  (param-on-set-p nil)
+  (param-on-unset-p nil)
+  (nick-param-p nil)
+  (class 'single-value-mode))
+
+
+(defparameter *default-char-to-channel-modes-map*
+  '(
+    ;; these modes don't take parameters
+    (#\a . :anonymous)
+    (#\i . :invite-only)
+    (#\m . :moderated)
+    (#\n . :no-external)
+    (#\q . :quiet)
+    (#\s . :secret)
+    (#\r . :reop)
+    (#\t . :op-only-topic)
+
+    ;; these modes take a user parameter
+    (#\O . :channel-creator)
+    (#\o . :channel-operator)
+    (#\v . :voice)
+
+    ;; these modes take a parameter other than a user
+    (#\l . :limit)
+    (#\k . :key)
+    (#\b . :ban)
+    (#\e . :ban-except)
+    (#\I . :invite-except)))
+
+(defparameter *char-to-user-modes-map*
+  '((#\a . :away)
+    (#\i . :invisible)
+    (#\w . :receive-wallops)
+    (#\s . :server-notices)
+    (#\r . :restricted-connection)
+    (#\o . :remote-operator)
+    (#\O . :local-operator)))
 
 (defparameter *reply-names*
   '((1 :rpl_welcome)

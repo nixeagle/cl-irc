@@ -1,3 +1,7 @@
+2005-03-21  Erik Huelsmann  <ehuelsmann@common-lisp.net>
+
+	Add MODE tracking support.
+
 2004-03-18  Erik Huelsmann  <ehuelsmann@common-lisp.net>
 
 	* protocol.lisp: Add defgenerics. Remove duplicates 
