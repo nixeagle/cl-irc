@@ -592,34 +592,32 @@ may be already be on."
 
 (defclass irc-error-reply (irc-message) ())
 
-(defun intern-message-symbol (prefix name)
-  "Intern based on symbol-name to support case-sensitive mlisp"
-  (intern
-   (concatenate 'string
-		(symbol-name prefix)
-		"-"
-		(symbol-name name)
-		"-"
-		(symbol-name '#:message))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun intern-message-symbol (prefix name)
+    "Intern based on symbol-name to support case-sensitive mlisp"
+    (intern
+     (concatenate 'string
+		  (symbol-name prefix)
+		  "-"
+		  (symbol-name name)
+		  "-"
+		  (symbol-name '#:message))))
 
-(defmacro define-irc-message (command)
-  (let ((name (intern-message-symbol :irc command)))
-    `(progn
-      (defmethod find-irc-message-class ((type (eql ,command)))
-	(find-class ',name))
-      (export ',name)
-      (defclass ,name (irc-message) ()))))
+  (defun define-irc-message (command)
+    (let ((name (intern-message-symbol :irc command)))
+      `(progn
+	(defmethod find-irc-message-class ((type (eql ,command)))
+	  (find-class ',name))
+	(export ',name)
+	(defclass ,name (irc-message) ())))))
 
-(defun create-irc-message-classes (class-list)
-  (dolist (class class-list)
-    (eval (list 'define-irc-message class)))) ; argh.  eval.
+(defmacro create-irc-message-classes (class-list)
+  `(progn ,@(mapcar #'define-irc-message class-list)))
 
 ;; should perhaps wrap this in an eval-when?
-(create-irc-message-classes (remove-duplicates
-                             (mapcar #'second *reply-names*)))
-(create-irc-message-classes '(:privmsg :notice :kick :topic :error
-                              :mode :ping :nick :join :part :quit :kill
-			      :pong :invite))
+(create-irc-message-classes #.(remove-duplicates (mapcar #'second *reply-names*)))
+(create-irc-message-classes (:privmsg :notice :kick :topic :error :mode :ping
+			     :nick :join :part :quit :kill :pong :invite))
 
 (defmethod find-irc-message-class (type)
   (declare (ignore type))
@@ -654,20 +652,20 @@ may be already be on."
 
 (defgeneric find-ctcp-message-class (type))
 
-(defmacro define-ctcp-message (ctcp-command)
-  (let ((name (intern-message-symbol :ctcp ctcp-command)))
-    `(progn
-      (defmethod find-ctcp-message-class ((type (eql ,ctcp-command)))
-	(find-class ',name))
-      (export ',name)
-      (defclass ,name (ctcp-mixin irc-message) ()))))
-
-(defun create-ctcp-message-classes (class-list)
-  (dolist (class class-list)
-    (eval (list 'define-ctcp-message class)))) ; argh.  eval.  must go away.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun define-ctcp-message (ctcp-command)
+    (let ((name (intern-message-symbol :ctcp ctcp-command)))
+      `(progn
+	(defmethod find-ctcp-message-class ((type (eql ,ctcp-command)))
+	  (find-class ',name))
+	(export ',name)
+	(defclass ,name (ctcp-mixin irc-message) ())))))
+  
+(defmacro create-ctcp-message-classes (class-list)
+  `(progn ,@(mapcar #'define-ctcp-message class-list)))
 
 ;; should perhaps wrap this in an eval-when?
-(create-ctcp-message-classes '(:action :source :finger :ping
+(create-ctcp-message-classes (:action :source :finger :ping
                                :version :userinfo :time :dcc-chat-request
                                :dcc-send-request))
 
