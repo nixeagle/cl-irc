@@ -151,6 +151,19 @@
                        :contents contents)
         *pending-memos*))
 
+(defun remove-memos (to &key from)
+  (let ((count 0))
+    (setf *pending-memos*
+          (remove-if #'(lambda (m)
+                         (and (string-equal (without-non-alphanumeric to)
+                                            (memo-to m))
+                              (or (not from)
+                                  (string-equal (without-non-alphanumeric from)
+                                                (memo-from m)))
+                              (incf count)))
+                     *pending-memos*))
+    count))
+
 (defun lookup-paste (number)
   (and (find-package :lisppaste)
        (let ((paste (funcall (intern "FIND-PASTE" :lisppaste) number)))
@@ -257,6 +270,7 @@
                                  (setf first-line (regex-replace-all "\\r" first-line " "))
                                  (setf first-line (regex-replace-all "\\n" first-line " "))
                                  (setf first-line (regex-replace-all "_\\(([^)]*)\\)" first-line "\\1"))
+                                 (setf first-line (regex-replace-all "#H\\(([^)]*)\\)" first-line "\\1"))
                                  (setf first-line (regex-replace-all "\\*\\(([^)]*)\\)" first-line "\\1"))
                                  (setf first-line (regex-replace-all "<[^>]+>" first-line ""))
                                  (setf first-line (regex-replace-all "^(([^.]|\\.\\S)+)\\.\\s+.*$" first-line "\\1."))
@@ -301,6 +315,9 @@
     ("memos" .
      ,(lambda (nick)
               (format nil "To send a memo, say something like ``~A: memo for nick: the memo''. I'll remember the memo for any nick which is the same as the given nick, +/- differences in punctuation, and any nick which is an alias for it, and give it to them when they next speak." nick)))
+    ("avoiding memos" .
+     ,(lambda (nick)
+              (format nil "To flush all your memos without delivery, say something like ``~A: discard my memos''. To flush only memos from a specific person, say ``~A: discard my memos from person''." nick nick)))
     ("nicknames" .
      ,(lambda (nick)
               (format nil "If you have multiple nicknames and want to get your memos at any of them, say something like ``~A: nick1 is another nick for nick2''. If you decide to give up a nick, say ``~:*~A: forget nick2'' and I'll forget it." nick)))
@@ -326,94 +343,185 @@
                  (cliki-find-help (concatenate 'string string
                                                (string #\s))))))))
 
+(defun random-element (list)
+  (elt list (random (length list))))
+
+(defparameter *last-eliza-times* (make-list 6 :initial-element 0))
+
+(defparameter *last-warning-time* 0)
+
+(defun do-eliza (first-pass)
+  (if (> (- (get-universal-time) 30)
+         *last-warning-time*)
+      (let ((time-6 (first *last-eliza-times*))
+            (time-4 (third *last-eliza-times*))
+            (time-2 (fifth *last-eliza-times*))
+            (current-time (get-universal-time))
+            (count 0)
+            (overload 0))
+        (if (or
+             (and
+              (< (- current-time 15)
+                 time-2)
+              (setf count 3)
+              (setf overload (- current-time time-2)))
+             (and
+              (< (- current-time 45)
+                 time-4)
+              (setf count 5)
+              (setf overload (- current-time time-4)))
+             (and
+              (< (- current-time 75)
+                 time-6)
+              (setf count 7)
+              (setf overload (- current-time time-6))))
+            (progn
+              (setf *last-warning-time* (get-universal-time))
+              (format nil "Would you /please/ stop playing with me? ~A messages in ~A seconds is too many." count overload))
+            (progn
+              (setf *last-eliza-times* (nconc (cdr *last-eliza-times*)
+                                              (list (get-universal-time))))
+              (ignore-errors (eliza::eliza first-pass)))
+            
+            ))))
+
 (defun cliki-lookup (term-with-question &key sender channel)
   (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2"))
         (should-send-cant-find t))
     (setf first-pass (regex-replace-all "\\s\\s+" first-pass ""))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
     (let ((scanned (or (nth-value 1 (scan-to-strings "^add\\s+\"([^\"]+)\"\\s+as:*\\s+(.+)$" first-pass))
-                        (nth-value 1 (scan-to-strings "^add\\s+(.+)\\s+as:*\\s+(.+)$" first-pass)))))
+                       (nth-value 1 (scan-to-strings "^add\\s+(.+)\\s+as:*\\s+(.+)$" first-pass)))))
       (if scanned
           (let ((term (elt scanned 0))
                 (defn (elt scanned 1)))
             (add-small-definition term defn)
             "OK, done.")
-	(let ((scanned (or
-                        (nth-value 1 (scan-to-strings "^alias\\s+\"([^\"]+)\"\\s+as:*\\s+(.+)$" first-pass))
-                        (nth-value 1 (scan-to-strings "^alias\\s+(.+)\\s+as:*\\s+(.+)$" first-pass))
-                        (nth-value 1 (scan-to-strings "^(.+)\\s+is\\s+another\\s+(name|word)\\s+for:*\\s+([^.]+)\\.*$" first-pass)))))
-          (if scanned
-              (let ((term (elt scanned 0))
-                    (defn (elt scanned (1- (length scanned)))))
-                (add-alias term defn)
-                "OK, done.")
-              (progn
-                (setf first-pass (regex-replace-all "(:|/|\\\\|\\#)" first-pass ""))
-                (when (and (scan "^(?i)lisppaste(\\s|!|\\?|\\.|$)*" first-pass)
-                           (find-package :lisppaste)
-                           channel
-                           (> (length channel) 0)
-                           (char= (elt channel 0) #\#)
-                           (funcall (intern "SAY-HELP" :lisppaste)
-                                    channel))
-                  (return-from cliki-lookup nil))
-                
-                (or
-                 (if (string-equal first-pass "help")
-                     (cliki-bot-help *cliki-nickname*))
-                 (let ((strings (nth-value 1 (scan-to-strings "^(?i)help\\s\"*([^\"]+)\"*$" first-pass))))
-                   (when strings
-                     (cliki-find-help (elt strings 0))))
-                 (let ((strings (nth-value 1 (scan-to-strings "^(?i)(memo|note)\\s+(for|to)\\s+(\\S+)\\s*[:,]+\\s+(.+)$" term-with-question))))
-                   (when (and sender strings)
-                     (if (string-equal (without-non-alphanumeric
-                                        (elt strings 2))
-                                       (without-non-alphanumeric
-                                        *cliki-nickname*))
-                         "Buzz off."
-                         (progn
-                           (add-memo
-                            sender
-                            (if (member (elt strings 2) '("self" "myself" "me") :test #'string-equal)
-                                sender
-                                (elt strings 2))
-                            (elt strings 3))
-                           (format nil "Remembered. I'll tell ~A when he/she/it next speaks." (elt strings 2))))))
-                 (let ((to-forget (nth-value 1 (scan-to-strings "^forget\\s+([^.]+)\\.*$" first-pass))))
-                   (when to-forget
-                     (forget (elt to-forget 0))
-                     (format nil "What's ~A? Never heard of it." (elt to-forget 0))))
-                 (let ((strs (nth-value 1 (scan-to-strings "^(?i)paste\\s+(\\d+)$" first-pass))))
-                   (and strs
-                        (lookup-paste (parse-integer (elt strs 0)))))
-                 (if (scan "^(?i)hello(\\s|$)*" first-pass) "what's up?")
-                 (if (scan "^(?i)hi(\\s|$)*" first-pass) "what's up?")
-                 (if (scan "^(?i)yo(\\s|$)*" first-pass) "what's up?")
-                 (if (scan "^(?i)thank(s| you)(\\s|!|\\?|\\.|$)*" first-pass)
-                     (if sender
-                         (format nil "~A: you failed the inverse turing test!" sender)
-                         "you failed the inverse turing test!"))
-                 (if (scan "^(?i)version(\\s|!|\\?|\\.|$)*" first-pass)
-                     (format nil "This is the minion bot, running on a ~A (~A) and running under ~A ~A." (machine-type) (machine-version) (lisp-implementation-type) (lisp-implementation-version)))
-                 (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
-                 (if (should-do-lookup first-pass (or channel sender ""))
-                     (aif (or (small-definition-lookup first-pass)
-                              (cliki-first-sentence first-pass)
-                              (alias-lookup first-pass))
-                          (prog1
-                              (concatenate 'string first-pass ": " it)
-                            (did-lookup first-pass (or channel sender ""))))
-                     (setf should-send-cant-find nil))
-                 (if (or
-                      (scan "(!|\\.|\\s.+\\?|\\)|\\()\\s*$" term-with-question)
-                      (scan "^\\s*\\S+\\s+\\S+.*$" term-with-question))
-                     ;;(generate-text (+ 20 (random 6)))
-                     (ignore-errors (eliza::eliza first-pass))
-                     )
-                 (when should-send-cant-find
-                   (format nil "Sorry, I couldn't find anything in the database for ``~A''.~A" first-pass (if (scan " " first-pass) " Maybe you meant to end with punctuation?" "")))
-                 ))))))))
-    
+          (let ((scanned (or
+                          (nth-value 1 (scan-to-strings "^alias\\s+\"([^\"]+)\"\\s+as:*\\s+(.+)$" first-pass))
+                          (nth-value 1 (scan-to-strings "^alias\\s+(.+)\\s+as:*\\s+(.+)$" first-pass))
+                          (nth-value 1 (scan-to-strings "^(.+)\\s+is\\s+another\\s+(name|word)\\s+for:*\\s+([^.]+)\\.*$" first-pass)))))
+            (if scanned
+                (let ((term (elt scanned 0))
+                      (defn (elt scanned (1- (length scanned)))))
+                  (add-alias term defn)
+                  "OK, done.")
+                (progn
+                  (setf first-pass (regex-replace-all "(:|/|\\\\|\\#)" first-pass ""))
+                  (when (and (scan "^(?i)lisppaste(\\s|!|\\?|\\.|$)*" first-pass)
+                             (find-package :lisppaste)
+                             channel
+                             (> (length channel) 0)
+                             (char= (elt channel 0) #\#)
+                             (funcall (intern "SAY-HELP" :lisppaste)
+                                      channel))
+                    (return-from cliki-lookup nil))
+                  (or
+                   (let ((strings
+                          (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach)\\s+(\\S+)\\s+(about|on|in|to|through|)\\s*(.+)$" first-pass))))
+                     (if strings
+                         (let ((about (cliki-lookup (elt strings 3) :sender sender
+                                                    :channel channel)))
+                           (if about
+                               (format nil "~A: ~A~A"
+                                       (elt strings 1)
+                                       (if (scan "http:" about)
+                                           (concatenate 'string
+                                                        (random-element
+                                                         '("have a look at"
+                                                           "please look at"
+                                                           "please see"
+                                                           "direct your attention towards"
+                                                           "look at"))
+                                                        " ")
+                                           "")
+                                       about)
+                               (setf should-send-cant-find nil)))))
+                   (if (string-equal first-pass "help")
+                       (if (should-do-lookup first-pass (or channel sender ""))
+                           (progn
+                             (did-lookup first-pass (or channel sender ""))
+                             (cliki-bot-help *cliki-nickname*))
+                           (setf should-send-cant-find nil)))
+                   (let ((strings (nth-value 1 (scan-to-strings "^(?i)help\\s+(on|about|to|describing|)\\s*\"*([^\"]+)\"*$" first-pass))))
+                     (if strings
+                         (if
+                          (should-do-lookup first-pass (or channel sender ""))
+                          (progn
+                            (did-lookup first-pass (or channel sender ""))
+                            (cliki-find-help (elt strings 1)))
+                          (setf should-send-cant-find nil))))
+                   (let ((strings (nth-value 1 (scan-to-strings "^(?i)(memo|note)\\s+(for|to)\\s+(\\S+)\\s*[:,]+\\s+(.+)$" term-with-question))))
+                     (when (and sender strings)
+                       (if (string-equal (without-non-alphanumeric
+                                          (elt strings 2))
+                                         (without-non-alphanumeric
+                                          *cliki-nickname*))
+                           "Buzz off."
+                           (progn
+                             (add-memo
+                              sender
+                              (if (member (elt strings 2) '("self" "myself" "me") :test #'string-equal)
+                                  sender
+                                  (elt strings 2))
+                              (elt strings 3))
+                             (format nil "Remembered. I'll tell ~A when he/she/it next speaks." (elt strings 2))))))
+                   (when (and sender
+                              (scan "^(?i)(discard|forget)\\s+(my\\s+|)memo(s|)$" first-pass))
+                     (let ((count (remove-memos sender)))
+                       (case count
+                         (0 "You didn't have any memos!")
+                         (1 "OK, I threw it out.")
+                         (t "OK, I threw them out."))))
+                   (let ((strings (nth-value 1 (scan-to-strings "^(?i)(discard|forget)\\s+(my\\s+|)memo(s|)\\s+from\\s+([^ .]+)\\.*$" first-pass))))
+                     (when (and sender
+                                strings)
+                       (let ((count (remove-memos sender :from (elt strings 3))))
+                         (case count
+                           (0 "You didn't have any memos!")
+                           (1 "OK, I threw it out.")
+                           (t "OK, I threw them out.")))
+                       ))
+                   (let ((to-forget (nth-value 1 (scan-to-strings "^forget\\s+([^.]+)\\.*$" first-pass))))
+                     (when to-forget
+                       (forget (elt to-forget 0))
+                       (format nil "What's ~A? Never heard of it." (elt to-forget 0))))
+                   (let ((strs (nth-value 1 (scan-to-strings "^(?i)paste\\s+(\\d+)$" first-pass))))
+                     (and strs
+                          (lookup-paste (parse-integer (elt strs 0)))))
+                   
+                   (if (scan "^(?i)hello(\\s|$)*" first-pass) "what's up?")
+                   (if (scan "^(?i)hi(\\s|$)*" first-pass) "what's up?")
+                   (if (scan "^(?i)yo(\\s|$)*" first-pass) "what's up?")
+                   (if (scan "^(?i)thank(s| you)(\\s|!|\\?|\\.|$)*" first-pass)
+                       (if sender
+                           (format nil "~A: you failed the inverse turing test!" sender)
+                           "you failed the inverse turing test!"))
+                   (if (scan "^(?i)version(\\s|!|\\?|\\.|$)*" first-pass)
+                       (format nil "This is the minion bot, running on a ~A (~A) and running under ~A ~A." (machine-type) (machine-version) (lisp-implementation-type) (lisp-implementation-version)))
+                   (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
+                   (if (should-do-lookup first-pass (or channel sender ""))
+                       (aif (or (small-definition-lookup first-pass)
+                                (cliki-first-sentence first-pass)
+                                (alias-lookup first-pass))
+                            (prog1
+                                (concatenate 'string first-pass ": " it)
+                              (did-lookup first-pass (or channel sender ""))))
+                       (setf should-send-cant-find nil))
+                   (if (and
+                        should-send-cant-find
+                        (or
+                         (scan "(!|\\.|\\s.+\\?|\\)|\\()\\s*$" term-with-question)
+                         (scan "^\\s*\\S+\\s+\\S+.*$" term-with-question)))
+                       ;;(generate-text (+ 20 (random 6)))
+                       (progn
+                         (setf should-send-cant-find nil)
+                         (do-eliza first-pass))
+                       )
+                   (when should-send-cant-find
+                     (format nil "Sorry, I couldn't find anything in the database for ``~A''.~A" first-pass (if (scan " " first-pass) " Maybe you meant to end with punctuation?" "")))
+                   ))))))))
+
 (defun valid-cliki-message (message)
   (scan *cliki-attention-prefix* (trailing-argument message)))
 
@@ -426,7 +534,6 @@
 
 (defun msg-hook (message)
   (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
-    (take-care-of-memos respond-to (source message))
     (if (valid-cliki-message message)
         (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
           (and response (privmsg *cliki-connection* respond-to response)))
@@ -434,7 +541,8 @@
           (aif (cliki-lookup (trailing-argument message) :sender (source message))
                (privmsg *cliki-connection* respond-to it))
           (if (anybody-here (trailing-argument message))
-              (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))))
+              (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))
+    (take-care-of-memos respond-to (source message))))
 
 (defvar *cliki-nickserv-password* "")
 

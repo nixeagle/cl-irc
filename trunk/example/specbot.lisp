@@ -66,7 +66,7 @@
 
 (defun add-simple-alist-lookup (file designator prefix description)
   (let ((alist (with-open-file (s file :direction :input) (read s))))
-    (push (cons designator alist) *alists*)
+    (pushnew (cons designator alist) *alists* :test #'equal)
     (setf *spec-providers*
           (nconc *spec-providers*
                  (list `((simple-alist-lookup ,designator) ,prefix ,description))))))
@@ -114,7 +114,7 @@
               do
               (aif (strip-address to-lookup :address (second type) :final t)
                    (let ((looked-up (funcall actual-fun it)))
-                     (if (and (< 0 (count #\space it) 3)
+                     (if (and (<= 0 (count #\space it) 1)
                               (not looked-up))
                          (setf looked-up (format nil "Sorry, I couldn't find anything for ~A."  it)))
                      (and looked-up
