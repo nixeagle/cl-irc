@@ -35,6 +35,8 @@
              :add-hook
              :remove-hook
              :remove-hooks
+             :remove-all-hooks
+             :add-default-hooks
              :get-hooks
              :make-user
              :nickname
