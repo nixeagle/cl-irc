@@ -265,7 +265,7 @@
                                  (multiple-value-bind (next-line missing-newline-p)
                                      (read-line stream nil)
                                    (if next-line
-                                       (setf first-line (concatenate 'string first-line next-line (string #\newline)))
+                                       (setf first-line (concatenate 'string first-line (string #\newline) next-line))
                                        (return-from cliki-return (format nil "The end of the page was reached before a definition was found in ~A" cliki-url))))
                                  (setf first-line (regex-replace-all "\\r" first-line " "))
                                  (setf first-line (regex-replace-all "\\n" first-line " "))
@@ -351,7 +351,7 @@
 (defparameter *last-warning-time* 0)
 
 (defun do-eliza (first-pass)
-  (if (> (- (get-universal-time) 30)
+  (if (> (- (get-universal-time) 60)
          *last-warning-time*)
       (let ((time-6 (first *last-eliza-times*))
             (time-4 (third *last-eliza-times*))
@@ -361,17 +361,17 @@
             (overload 0))
         (if (or
              (and
-              (< (- current-time 15)
+              (< (- current-time 60)
                  time-2)
               (setf count 3)
               (setf overload (- current-time time-2)))
              (and
-              (< (- current-time 45)
+              (< (- current-time 75)
                  time-4)
               (setf count 5)
               (setf overload (- current-time time-4)))
              (and
-              (< (- current-time 75)
+              (< (- current-time 90)
                  time-6)
               (setf count 7)
               (setf overload (- current-time time-6))))
@@ -384,6 +384,12 @@
               (ignore-errors (eliza::eliza first-pass)))
             
             ))))
+
+(defvar *more* "CODE")
+
+(defun scan-for-more (s)
+  (let ((str (nth-value 1 (scan-to-strings "(?i)more\\W+(\\w+)" s))))
+    (and str (setf *more* (string-upcase (elt str 0))))))
 
 (defun cliki-lookup (term-with-question &key sender channel)
   (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2"))
@@ -408,6 +414,8 @@
                   "OK, done.")
                 (progn
                   (setf first-pass (regex-replace-all "(:|/|\\\\|\\#)" first-pass ""))
+                  (setf first-pass (regex-replace-all "^(?i)(.*[^, ])(,|)\\s*please$" first-pass "\\1"))
+                  (setf first-pass (regex-replace-all "^(?i)please(,|)\\s*(.*[^, ])$" first-pass "\\1"))
                   (when (and (scan "^(?i)lisppaste(\\s|!|\\?|\\.|$)*" first-pass)
                              (find-package :lisppaste)
                              channel
@@ -418,7 +426,8 @@
                     (return-from cliki-lookup nil))
                   (or
                    (let ((strings
-                          (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach)\\s+(\\S+)\\s+(about|on|in|to|through|)\\s*(.+)$" first-pass))))
+                          (or
+                           (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach)\\s+(\\S+)\\s+(about|on|in|to|through|)\\s*(.+)$" first-pass)))))
                      (if strings
                          (let ((about (cliki-lookup (elt strings 3) :sender sender
                                                     :channel channel)))
@@ -500,6 +509,8 @@
                    (if (scan "^(?i)version(\\s|!|\\?|\\.|$)*" first-pass)
                        (format nil "This is the minion bot, running on a ~A (~A) and running under ~A ~A." (machine-type) (machine-version) (lisp-implementation-type) (lisp-implementation-version)))
                    (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
+                   (if (scan "^(?i)chant$" first-pass)
+                       (format nil "MORE ~A" *more*))
                    (if (should-do-lookup first-pass (or channel sender ""))
                        (aif (or (small-definition-lookup first-pass)
                                 (cliki-first-sentence first-pass)
@@ -522,6 +533,8 @@
                      (format nil "Sorry, I couldn't find anything in the database for ``~A''.~A" first-pass (if (scan " " first-pass) " Maybe you meant to end with punctuation?" "")))
                    ))))))))
 
+
+
 (defun valid-cliki-message (message)
   (scan *cliki-attention-prefix* (trailing-argument message)))
 
@@ -533,6 +546,7 @@
 	  (scan "^(?i)\\s*(hello|hi|yo)\\s*(channel|room|people|ppl|all|peeps|)\\s*$" string))))
 
 (defun msg-hook (message)
+  (scan-for-more (trailing-argument message))
   (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
     (if (valid-cliki-message message)
         (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))

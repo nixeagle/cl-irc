@@ -65,11 +65,12 @@
 (defvar *alists* nil)
 
 (defun add-simple-alist-lookup (file designator prefix description)
-  (let ((alist (with-open-file (s file :direction :input) (read s))))
-    (pushnew (cons designator alist) *alists* :test #'equal)
-    (setf *spec-providers*
-          (nconc *spec-providers*
-                 (list `((simple-alist-lookup ,designator) ,prefix ,description))))))
+  (unless (assoc designator *alists*)
+    (let ((alist (with-open-file (s file :direction :input) (read s))))
+      (push (cons designator alist) *alists*)
+      (setf *spec-providers*
+            (nconc *spec-providers*
+                   (list `((simple-alist-lookup ,designator) ,prefix ,description)))))))
 
 (defun simple-alist-lookup (designator string)
   (let ((alist (cdr (assoc designator *alists*))))
@@ -119,9 +120,17 @@
                          (setf looked-up (format nil "Sorry, I couldn't find anything for ~A."  it)))
                      (and looked-up
                           (privmsg *connection* destination looked-up))))))))
-  
+
+(defparameter *754-file*
+  (merge-pathnames "754.lisp-expr"
+                   (make-pathname
+                    :directory
+                    (pathname-directory
+                     (or *load-truename*
+                         *default-pathname-defaults*)))))
+
 (defun start-specbot (nick server &rest channels)
-  (add-simple-alist-lookup "754.lisp-expr" 'ieee754 "ieee754" "Section numbers of IEEE 754")
+  (add-simple-alist-lookup *754-file* 'ieee754 "ieee754" "Section numbers of IEEE 754")
   (setf *nickname* nick)
   (setf *connection* (connect :nickname *nickname* :server server))
   (mapcar #'(lambda (channel) (join *connection* channel)) channels)
