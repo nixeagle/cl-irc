@@ -1,0 +1,17 @@
+Source: cl-irc
+Section: devel
+Priority: optional
+Maintainer: Kevin M. Rosenberg <kmr@debian.org>
+Build-Depends-Indep: debhelper (>> 4.0.0)
+Standards-Version: 3.6.1.0
+
+Package: cl-irc
+Architecture: all
+Depends: ${shlibs:Depends}, common-lisp-controller (>= 3.37)
+Description: Common Lisp Internet Relay Chat Library
+ cl-irc provides a library for Common Lisp programs to interact with
+ IRC servers. This library has been most tested with SBCL.
+ Several example programs are provided.
+
+
+
