@@ -20,7 +20,7 @@
 (in-package :clhs)
 
 ;;; CLHS. This will be the default lookup.
-(defparameter *hyperspec-pathname* #p"/Users/chandler/Sites/HyperSpec/")
+(defparameter *hyperspec-pathname* #p"/home/bmastenbrook/HyperSpec/")
 
 (defparameter *hyperspec-map-file* (merge-pathnames "Data/Map_Sym.txt" *hyperspec-pathname*))
 
@@ -55,23 +55,23 @@
       ;; Yuk. I know. Fixes welcome.
       (loop for section from 0 to 27
             do (add-clhs-section-to-table section)
-            do (loop named s for s1 from 1 to 17
+            do (loop named s for s1 from 1 to 26
                      unless (valid-target section s1)
                        do (return-from s nil)
                      do (add-clhs-section-to-table section s1)
-                       do (loop named ss for s2 from 1 to 17
+                       do (loop named ss for s2 from 1 to 26
                                 unless (valid-target section s1 s2)
                                   do (return-from ss nil)
                                 do (add-clhs-section-to-table section s1 s2)
-                                do (loop named sss for s3 from 1 to 17
+                                do (loop named sss for s3 from 1 to 26
                                          unless (valid-target section s1 s2 s3)
                                            do (return-from sss nil)
                                          do (add-clhs-section-to-table section s1 s2 s3)
-                                         do (loop named ssss for s4 from 1 to 17
+                                         do (loop named ssss for s4 from 1 to 26
                                                   unless (valid-target section s1 s2 s3 s4)
                                                     do (return-from ssss nil)
                                                   do (add-clhs-section-to-table section s1 s2 s3 s4)
-                                                  do (loop named sssss for s5 from 1 to 17
+                                                  do (loop named sssss for s5 from 1 to 26
                                                            unless (valid-target section s1 s2 s3 s4 s5)
                                                              do (return-from sssss nil)
                                                            do (add-clhs-section-to-table section s1 s2 s3 s4 s5))))))))
