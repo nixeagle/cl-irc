@@ -97,7 +97,9 @@
                          (source message)
                          (first (arguments message))))
         (to-lookup (strip-address (trailing-argument message))))
-    (if (and (not (string= to-lookup (trailing-argument message)))
+    (if (and (or
+              (string-equal (first (arguments message)) *nickname*)
+              (not (string= to-lookup (trailing-argument message))))
              (member to-lookup '("help" "help?") :test #'string-equal))
         (progn
           (privmsg *connection* destination
