@@ -208,7 +208,7 @@ It returns a list of mode-description records."
                        ;; C type mode from CHANMODES
                        (t   nil nil single-value-mode)
                        ;; D type mode from CHANMODES
-                       (nil nil nil single-value-mode))))
+                       (nil nil nil boolean-value-mode))))
     (do ((mode (pop modes-list) (pop modes-list))
          (mode-desc (pop mode-descs) (pop mode-descs)))
         ((null mode-desc) mode-desc-recs)

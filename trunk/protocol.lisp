@@ -45,12 +45,29 @@ user class.")))
   (setf (value mode) nil))
 
 
+;; mode class for holding boolean values
+
+(defclass boolean-value-mode (irc-mode) ())
+
+(defmethod set-mode-value ((mode boolean-value-mode) value)
+  (declare (ignore value))
+  (setf (value mode) t))
+
+(defmethod unset-mode-value ((mode boolean-value-mode) value)
+  (declare (ignore value))
+  (setf (value mode) nil))
+
+(defmethod has-value-p ((mode boolean-value-mode) value
+                        &key key test)
+  (declare (ignore value key test))
+  (value mode))
+
 ;; mode class for holding single values
 
 (defclass single-value-mode (irc-mode) ())
 
 (defmethod set-mode-value ((mode single-value-mode) value)
-  (setf (value mode) (or value t)))
+  (setf (value mode) value))
 
 (defmethod unset-mode-value ((mode single-value-mode) value)
   (when (or (null value)

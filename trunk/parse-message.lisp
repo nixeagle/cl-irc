@@ -151,12 +151,12 @@ in the message."
           (ctcp (ctcp-message-type trailing-argument)))
       (when command
         (cond
-          (nil ;(irc-error-reply-p command)
-           ;; Disable for now, as it prevents adding hooks for some useful
-           ;; error types
-           (progn
-             (setf command (find-reply-name (parse-integer command)))
-             (setf class 'irc-error-reply)))
+;;           (nil ;(irc-error-reply-p command)
+;;            ;; Disable for now, as it prevents adding hooks for some useful
+;;            ;; error types
+;;            (progn
+;;              (setf command (find-reply-name (parse-integer command)))
+;;              (setf class 'irc-error-reply)))
           ((numeric-reply-p command)
            (progn
              (setf command (find-reply-name (parse-integer command)))
