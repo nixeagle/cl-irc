@@ -20,7 +20,7 @@
 (in-package :clhs)
 
 ;;; CLHS. This will be the default lookup.
-(defparameter *hyperspec-pathname* #p"/Users/chandler/HyperSpec/")
+(defparameter *hyperspec-pathname* #p"/home/bmastenbrook/HyperSpec/")
 
 (defparameter *hyperspec-map-file* (merge-pathnames "Data/Map_Sym.txt" *hyperspec-pathname*))
 
@@ -77,7 +77,7 @@
                                                            do (add-clhs-section-to-table section s1 s2 s3 s4 s5))))))))
     ;; format directives
     (loop for code from 32 to 127
-          do (setf (gethash (format nil "format:~A" (code-char code)) *table*)
+          do (setf (gethash (format nil "~~~A" (code-char code)) *table*)
                    (concatenate 'string
                     *hyperspec-root*
                     (case (code-char code)

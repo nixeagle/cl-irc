@@ -174,7 +174,7 @@
 
 (defparameter *cliki-bot-help* "The minion bot supplies small definitions and performs lookups on CLiki. To use it, try ``minion: term?''. To add a term for IRC, try saying ``minion: add \"term\" as: definition'' or ``minion: alias \"term\" as: term''; otherwise, edit the corresponding CLiki page.")
 
-(defun cliki-lookup (term-with-question &optional sender)
+(defun cliki-lookup (term-with-question &key sender channel)
   (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2")))
     (setf first-pass (regex-replace-all "\\s\\s+" first-pass ""))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
@@ -190,6 +190,14 @@
 	      "OK, done.")
 	  (progn
 	    (setf first-pass (regex-replace-all "(:|/|\\\\|\\#)" first-pass ""))
+            (when (and (scan "^(?i)lisppaste(\\s|!|\\?|\\.|$)*" first-pass)
+                        (find-package :lisppaste)
+                        channel
+                        (> (length channel) 0)
+                        (char= (elt channel 0) #\#))
+               (funcall (intern "SAY-HELP" :lisppaste)
+                        channel)
+               (return-from cliki-lookup nil))
 	    (or
 	     (if (string-equal first-pass "help") *cliki-bot-help*)
              (if (scan "^(?i)hello(\\s|$)*" first-pass) "what's up?")
@@ -225,7 +233,8 @@
 (defun msg-hook (message)
   (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
     (if (valid-cliki-message message)
-	(privmsg *cliki-connection* respond-to (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") (source message)))
+        (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
+          (and response (privmsg *cliki-connection* respond-to response)))
       (if (string-equal (first (arguments message)) *cliki-nickname*)
 	  (privmsg *cliki-connection* respond-to (cliki-lookup (trailing-argument message)))
 	(if (anybody-here (trailing-argument message))
