@@ -82,6 +82,9 @@ registered."
   (remove-all-channels connection)
   (remove-all-users connection)
   (send-irc-message connection :quit message)
+  #+(and sbcl (not sb-thread))
+  (sb-sys:invalidate-descriptor (sb-bsd-sockets:socket-file-descriptor
+                               (server-socket connection)))
   (close (server-stream connection)))
 
 (defmethod squit ((connection connection) (server string) (comment string))
