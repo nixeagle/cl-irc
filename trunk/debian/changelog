@@ -1,3 +1,9 @@
+cl-irc (0.6.0) unstable; urgency=low
+
+  * New upstream
+
+ -- Kevin M. Rosenberg <kmr@debian.org>  Thu, 12 Aug 2004 20:47:34 -0600
+
 cl-irc (0.5.2) unstable; urgency=low
 
   * New upstream
