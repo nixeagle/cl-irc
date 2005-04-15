@@ -18,6 +18,7 @@
              :server-name
              :no-such-reply
              :irc-mode
+             :boolean-value-mode
              :single-value-mode
              :list-value-mode
              :add-mode
