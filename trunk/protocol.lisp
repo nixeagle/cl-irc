@@ -432,10 +432,11 @@ user at this end can be reached via your normal connection object.")
 ;; argh.  I want to name this quit but that gives me issues with
 ;; generic functions.  need to resolve.
 (defmethod dcc-close ((connection dcc-connection))
+  #+(and sbcl (not sb-thread))
+  (sb-sys:invalidate-descriptor (sb-sys:fd-stream-fd (stream connection)))
   (close (dcc-stream connection))
   (setf (user connection) nil)
   (setf *dcc-connections* (remove connection *dcc-connections*))
-  #+sbcl (sb-bsd-sockets:socket-close (socket connection))
   )
 
 (defmethod connectedp ((connection dcc-connection))
