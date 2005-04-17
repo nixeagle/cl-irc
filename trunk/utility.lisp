@@ -106,6 +106,41 @@ parse-integer) on each of the string elements."
         (fourth (ldb (byte 8 0) integer)))
     (vector first second third fourth)))
 
+(defun connect-to-server-socket (host port)
+  #+sbcl
+  (let ((s (make-instance 'sb-bsd-sockets:inet-socket
+                          :type :stream
+                          :protocol :tcp)))
+    (sb-bsd-sockets:socket-connect s (car (sb-bsd-sockets:host-ent-addresses
+                                           (sb-bsd-sockets:get-host-by-name host))) port)
+    s)
+  )
+
+(defun socket-stream (socket)
+  #+sbcl
+  (sb-bsd-sockets:socket-make-stream socket
+                                     :element-type 'character
+                                     :input t
+                                     :output t
+                                     :buffering :none)
+  )
+
+(defun socket-connect (server port)
+  "Create a socket connected to `server':`port' and return stream for it."
+  #+lispworks (comm:open-tcp-stream server port :errorp t)
+  #+cmu       (sys:make-fd-stream (ext:connect-to-inet-socket server port)
+                                  :input t
+                                  :output t
+                                  :element-type 'character)
+  #+allegro (socket:make-socket :remote-host server :remote-port port)
+  #+sbcl (socket-stream (connect-to-server-socket server port))
+  #+openmcl (ccl:make-socket :remote-host server :remote-port port)
+  #+armedbear (ext:get-socket-stream (ext:make-socket server port))
+  #-(or lispworks cmu allegro sbcl openmcl armedbear)
+  (warn "socket-connect not supported for this implementation.")
+  )
+
+
 (defun cut-between (string start-char end-chars &key (start 0) (cut-extra t))
   "If `start-char' is not nil, cut string between `start-char' and any
 of the `end-chars', from `start'.  If `start-char' is nil, cut from

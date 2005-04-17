@@ -394,12 +394,7 @@ user at this end can be reached via your normal connection object.")
    (output-stream
     :initarg :output-stream
     :accessor output-stream
-    :initform t)
-   (socket
-    :initarg :socket
-    :accessor socket
-    :documentation "The actual socket object for the connection
-between the two users.")))
+    :initform t)))
 
 (defmethod print-object ((object dcc-connection) stream)
   "Print the object for the Lisp reader."
@@ -414,23 +409,10 @@ between the two users.")))
                                  (remote-address nil)
                                  (remote-port nil)
                                  (output-stream t))
-  #+sbcl
-  (let ((socket (sb-bsd-sockets:make-inet-socket :stream :tcp)))
-    (sb-bsd-sockets:socket-connect socket remote-address remote-port)
-    (make-instance 'dcc-connection
-                   :user user
-                   :stream (sb-bsd-sockets:socket-make-stream socket :input t :output t :buffering :none)
-                   :socket socket
-                   :output-stream output-stream))
-  #+openmcl
-  (let ((socket-stream (ccl:make-socket :remote-host remote-address
-                                        :remote-port remote-port)))
-    (make-instance 'dcc-connection
-                   :user user
-                   :stream socket-stream
-                   :output-stream output-stream))
-  #-(or openmcl sbcl)
-  (warn "make-dcc-connection not supported for this implementation."))
+  (make-instance 'dcc-connection
+                 :user user
+                 :stream (socket-stream remote-address remote-port)
+                 :output-stream output-stream))
 
 (defgeneric dcc-close (connection))
 (defgeneric send-dcc-message (connection message))

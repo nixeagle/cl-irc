@@ -230,7 +230,7 @@ registered."
 
 (defmethod stats ((connection connection) &optional (query "") (target ""))
   (send-irc-message connection :stats nil query target))
-                  
+
 (defmethod links ((connection connection) &optional (remote-server "")
                   (server-mask ""))
   (send-irc-message connection :links nil remote-server server-mask))
@@ -238,38 +238,6 @@ registered."
 (defmethod time- ((connection connection) &optional (target ""))
   (send-irc-message connection :time nil target))
 
-(defun connect-to-server-socket (host port)
-  #+sbcl
-  (let ((s (make-instance 'sb-bsd-sockets:inet-socket
-                          :type :stream
-                          :protocol :tcp)))
-    (sb-bsd-sockets:socket-connect s (car (sb-bsd-sockets:host-ent-addresses
-                                           (sb-bsd-sockets:get-host-by-name host))) port)
-    s)
-  )
-
-(defun socket-stream (socket)
-  #+sbcl
-  (sb-bsd-sockets:socket-make-stream socket
-                                     :element-type 'character
-                                     :input t
-                                     :output t
-                                     :buffering :none)
-  #+openmcl
-  socket)
-
-(defun socket-connect (server port)
-  #+lispworks (comm:open-tcp-stream server port :errorp t)
-  #+cmu       (sys:make-fd-stream (ext:connect-to-inet-socket server port)
-                                  :input t
-                                  :output t
-                                  :element-type 'character)
-  #+allegro (socket:make-socket :remote-host server :remote-port port)
-  #+sbcl (socket-stream (connect-to-server-socket server port))
-  #+openmcl (ccl:make-socket :remote-host server :remote-port port)
-  #+armedbear (ext:get-socket-stream (ext:make-socket server port))
-  )
-  
 (defun connect (&key (nickname *default-nickname*)
                      (username nil)
                      (realname nil)
