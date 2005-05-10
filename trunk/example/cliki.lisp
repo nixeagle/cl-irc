@@ -239,41 +239,6 @@
                       (funcall (intern "PASTE-CHANNEL" :lisppaste) paste)
                       (funcall (intern "PASTE-DISPLAY-URL" :lisppaste) paste))))))
 
-(defun url-port (url)
-  (assert (string-equal url "http://" :end1 7))
-  (let ((path-start (position #\/ url :start 7)))
-    (let ((port-start (position #\: url :start 7 :end path-start)))
-      (if port-start (parse-integer url :start (1+ port-start) :junk-allowed t) 80))))
-
-(defun url-host (url)
-  (assert (string-equal url "http://" :end1 7))
-  (let* ((port-start (position #\: url :start 7))
-	 (host-end (min (or (position #\/ url :start 7) (length url))
-			(or port-start (length url)))))
-    (subseq url 7 host-end)))
-
-(defun url-connection (url)
-  (let* ((host (url-host url))
-         (port (url-port url))
-         (stream (socket-connect host port)))
-    ;; we are exceedingly unportable about proper line-endings here.
-    ;; Anyone wishing to run this under non-SBCL should take especial care
-
-    (format stream "GET ~A HTTP/1.0~%Host: ~A~%User-Agent: CLiki Bot~%~%" url host)
-    (force-output stream)
-    (list
-     (let* ((l (read-line stream))
-            (space (position #\Space l)))
-       (parse-integer l :start (1+ space) :junk-allowed t))
-     (loop for line = (read-line stream nil nil)
-           until (or (null line) (eql (elt line 0) (code-char 13)))
-           collect
-           (let ((colon (position #\: line)))
-             (cons (intern (string-upcase (subseq line 0 colon)) :keyword)
-                   (string-trim (list #\Space (code-char 13))
-                                (subseq line (1+ colon))))))
-     stream)))
-
 (defun encode-for-url (str)
   (setf str (regex-replace-all " " str "%20"))
   (setf str (regex-replace-all "," str "%2C"))
@@ -306,35 +271,21 @@
       (if interrupt-thread
           (ccl:process-kill interrupt-thread)))))
 
-(defun http-get (url)
+(defun cliki-first-sentence (term)
   (host-with-timeout
    5
-   (destructuring-bind (response headers stream)
-       (block got
-         (loop
-          (destructuring-bind (response headers stream) (url-connection url)
-            (unless (member response '(301 302))	       
-              (return-from got (list response headers stream)))
-            (close stream)
-            (setf stream nil)
-            (setf url (cdr (assoc :location headers))))))
-     (if (not (eql response 200))
-         nil
-         stream))))
-
-(defun cliki-first-sentence (term)
-  (let* ((cliki-url (format nil "http://www.cliki.net/~A"
-                            (encode-for-url term)))
-         (url (concatenate 'string cliki-url "?source")))
-    (block cliki-return
-      (handler-case
-          (let ((stream (http-get url)))
-            (unwind-protect
-                 (if (not stream)
-                     nil
-                     ;;(format nil "The term ~A was not found in CLiki." term)
-                     (let ((first-line ""))
-                       (loop for i from 1 to 5 do ;; scan the first 5 lines
+   (let* ((cliki-url (format nil "http://www.cliki.net/~A"
+			     (encode-for-url term)))
+	  (url (concatenate 'string cliki-url "?source")))
+     (block cliki-return
+       (handler-case
+	   (let ((stream (third (trivial-http:http-get url))))
+	     (unwind-protect
+		  (if (not stream)
+		      nil
+		      ;;(format nil "The term ~A was not found in CLiki." term)
+		      (let ((first-line ""))
+			(loop for i from 1 to 5 do ;; scan the first 5 lines
                              (progn
                                (multiple-value-bind (next-line missing-newline-p)
                                    (read-line stream nil)
@@ -353,10 +304,10 @@
                                (when (scan "^([^.]|\\.\\S)+[.?!]$" first-line)
                                  (setf first-line (concatenate 'string first-line " " cliki-url))
                                  (return-from cliki-return first-line))))
-                       (format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
-              (if stream (close stream))))
-        (condition (c &rest whatever) (return-from cliki-return (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " ")))))
-    ))
+			(format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
+	       (if stream (close stream))))
+	 (condition (c &rest whatever) (return-from cliki-return (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " ")))))
+     )))
 
 (defun shorten (url)
   (handler-case
@@ -529,7 +480,7 @@
 (defun cliki-lookup (term-with-question &key sender channel)
   (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2"))
         (should-send-cant-find t))
-    (setf first-pass (regex-replace-all "\\s\\s+" first-pass ""))
+    (setf first-pass (regex-replace-all "\\s\\s+" first-pass " "))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
     (let ((scanned (or (nth-value 1 (scan-to-strings "^add\\s+\"([^\"]+)\"\\s+as:*\\s+(.+)$" first-pass))
                        (nth-value 1 (scan-to-strings "^add\\s+(.+)\\s+as:*\\s+(.+)$" first-pass)))))
