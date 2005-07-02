@@ -3,11 +3,11 @@ Section: devel
 Priority: optional
 Maintainer: Peter Van Eynde <pvaneynd@debian.org>
 Build-Depends-Indep: debhelper (>> 4.0.0)
-Standards-Version: 3.6.1.1
+Standards-Version: 3.6.2.1
 
 Package: cl-irc
 Architecture: all
-Depends: ${shlibs:Depends}, common-lisp-controller (>= 3.37), cl-split-sequence
+Depends: common-lisp-controller (>= 3.37), cl-split-sequence
 Description: Common Lisp Internet Relay Chat Library
  cl-irc provides a library for Common Lisp programs to interact with
  IRC servers. This library has been most tested with SBCL.
