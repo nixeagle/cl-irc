@@ -182,16 +182,19 @@
 
 (defvar *advice-db* nil)
 
+(defun advice-db ()
+  (when (not *advice-db*)
+    (with-open-file (ad *advice-file* :direction :input)
+      (setf *advice-db* (read ad))))
+  *advice-db*)
+
 (defun lookup-advice (num-str)
   (let ((num (parse-integer num-str :junk-allowed t)))
-    (when (not *advice-db*)
-      (with-open-file (ad *advice-file* :direction :input)
-        (setf *advice-db* (read ad))))
-    (or (cdr (assoc num *advice-db*))
+    (or (cdr (assoc num (advice-db)))
         "You can't just make up advice numbers and expect a response.")))
 
 (defun random-advice ()
-  (let ((item (random-element *advice-db*)))
+  (let ((item (random-element (advice-db))))
     (format nil "#~A: ~A" (car item) (cdr item))))
 
 (defun search-advice (str)
@@ -222,7 +225,7 @@
                     (if (and (not (zerop score))
                              (eql score max-score))
                         (push e max-score-items)))))
-          *advice-db*)
+          (advice-db))
     (if (zerop max-score)
         "You can't expect automated advice for everything."
         (let ((item (random-element max-score-items)))
@@ -271,47 +274,60 @@
       (if interrupt-thread
           (ccl:process-kill interrupt-thread)))))
 
+(defun http-get-recursively (url)
+  (destructuring-bind (status headers stream)
+      (trivial-http:http-get url)
+    (if (and (eql status 302)
+	     (assoc :location headers))
+	(progn
+	  (close stream)
+	  (http-get-recursively (cdr (assoc :location headers))))
+	(list status headers stream))))
+
 (defun cliki-first-sentence (term)
-  (host-with-timeout
-   5
-   (let* ((cliki-url (format nil "http://www.cliki.net/~A"
+  (let* ((cliki-url (format nil "http://www.cliki.net/~A"
 			     (encode-for-url term)))
 	  (url (concatenate 'string cliki-url "?source")))
      (block cliki-return
        (handler-case
-	   (let ((stream (third (trivial-http:http-get url))))
-	     (unwind-protect
-		  (if (not stream)
-		      nil
-		      ;;(format nil "The term ~A was not found in CLiki." term)
-		      (let ((first-line ""))
-			(loop for i from 1 to 5 do ;; scan the first 5 lines
-                             (progn
-                               (multiple-value-bind (next-line missing-newline-p)
-                                   (read-line stream nil)
-                                 (if next-line
-                                     (setf first-line (concatenate 'string first-line (string #\newline) next-line))
-                                     (return-from cliki-return (format nil "The end of the page was reached before a definition was found in ~A" cliki-url))))
-                               (setf first-line (regex-replace-all "\\r" first-line " "))
-                               (setf first-line (regex-replace-all "\\n" first-line " "))
-                               (setf first-line (regex-replace-all "_\\(([^)]*)\\)" first-line "\\1"))
-                               (setf first-line (regex-replace-all "#H\\(([^)]*)\\)" first-line "\\1"))
-                               (setf first-line (regex-replace-all "\\*\\(([^)]*)\\)" first-line "\\1"))
-                               (setf first-line (regex-replace-all "<[^>]+>" first-line ""))
-                               (setf first-line (regex-replace-all "^(([^.]|\\.\\S)+)\\.\\s+.*$" first-line "\\1."))
-                               (setf first-line (regex-replace-all "(\\s)\\s+" first-line "\\1"))
-                               (setf first-line (regex-replace-all "^\\s*(.+\\S)\\s*$" first-line "\\1"))
-                               (when (scan "^([^.]|\\.\\S)+[.?!]$" first-line)
-                                 (setf first-line (concatenate 'string first-line " " cliki-url))
-                                 (return-from cliki-return first-line))))
-			(format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
-	       (if stream (close stream))))
+	   (host-with-timeout
+	    5
+	    (destructuring-bind (status headers stream)
+		(http-get-recursively url)
+	     (declare (ignore headers))
+	     ;; Please don't hack on this when tired; it's easy to make it leak fds.
+	       (unwind-protect
+		 (if (or (not (eql status 200)) (not stream))
+			nil
+			;;(format nil "The term ~A was not found in CLiki." term)
+			(let ((first-line ""))
+			  (loop for i from 1 to 5 do ;; scan the first 5 lines
+			       (progn
+				 (multiple-value-bind (next-line missing-newline-p)
+				     (read-line stream nil)
+				   (if next-line
+				       (setf first-line (concatenate 'string first-line (string #\newline) next-line))
+				       (return-from cliki-return (format nil "The end of the page was reached before a definition was found in ~A" cliki-url))))
+				 (setf first-line (regex-replace-all "\\r" first-line " "))
+				 (setf first-line (regex-replace-all "\\n" first-line " "))
+				 (setf first-line (regex-replace-all "_\\(([^)]*)\\)" first-line "\\1"))
+				 (setf first-line (regex-replace-all "#H\\(([^)]*)\\)" first-line "\\1"))
+				 (setf first-line (regex-replace-all "\\*\\(([^)]*)\\)" first-line "\\1"))
+				 (setf first-line (regex-replace-all "<[^>]+>" first-line ""))
+				 (setf first-line (regex-replace-all "^(([^.]|\\.\\S)+)\\.\\s+.*$" first-line "\\1."))
+				 (setf first-line (regex-replace-all "(\\s)\\s+" first-line "\\1"))
+				 (setf first-line (regex-replace-all "^\\s*(.+\\S)\\s*$" first-line "\\1"))
+				 (when (scan "^([^.]|\\.\\S)+[.?!]$" first-line)
+				   (setf first-line (concatenate 'string first-line " " cliki-url))
+				   (return-from cliki-return first-line))))
+			  (format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
+		 (if stream (close stream)))))
 	 (condition (c &rest whatever) (return-from cliki-return (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " ")))))
-     )))
+     ))
 
 (defun shorten (url)
   (handler-case
-      (let ((stream (http-get (format nil "http://shorl.com/create.php?url=~A" url))))
+      (let ((stream (trivial-http:http-get (format nil "http://shorl.com/create.php?url=~A" url))))
         (finish-output t)
         (unwind-protect
              (when stream
@@ -478,7 +494,7 @@
               )))))))))
     
 (defun cliki-lookup (term-with-question &key sender channel)
-  (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)(\\?*)$" term-with-question "\\2"))
+  (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)([?.!,;]*)$" term-with-question "\\2"))
         (should-send-cant-find t))
     (setf first-pass (regex-replace-all "\\s\\s+" first-pass " "))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
@@ -675,22 +691,25 @@
 	  (scan "^(?i)\\s*(hello|hi|yo)\\s*(channel|room|people|ppl|all|peeps|)\\s*$" string))))
 
 (defun msg-hook (message)
-  (handler-case
-      (progn
-        (scan-for-more (trailing-argument message))
-        (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
-          (if (valid-cliki-message message)
-              (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
-                (and response (privmsg *cliki-connection* respond-to response)))
-              (if (string-equal (first (arguments message)) *cliki-nickname*)
-                  (aif (cliki-lookup (trailing-argument message) :sender (source message))
-                       (privmsg *cliki-connection* respond-to it))
-                  (if (anybody-here (trailing-argument message))
-                      (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))
-          (take-care-of-memos respond-to (source message))))
-    (serious-condition (c)
-      (format *trace-output* "Caught error: ~A~%" c)
-      #+sbcl (sb-debug:backtrace 5 *trace-output*))))
+  (handler-bind
+      ((serious-condition (lambda (c)
+	 (format *trace-output* "Caught error: ~A~%" c)
+	 #+nil (sb-debug:backtrace 10 *trace-output*)
+	 (format *trace-output* "~A~%"
+		 (nthcdr 10 (sb-debug:backtrace-as-list)))
+	 (return-from msg-hook))))
+    (progn
+      (scan-for-more (trailing-argument message))
+      (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
+	(if (valid-cliki-message message)
+	    (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
+	      (and response (privmsg *cliki-connection* respond-to response)))
+	    (if (string-equal (first (arguments message)) *cliki-nickname*)
+		(aif (cliki-lookup (trailing-argument message) :sender (source message))
+		     (privmsg *cliki-connection* respond-to it))
+		(if (anybody-here (trailing-argument message))
+		    (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))
+	(take-care-of-memos respond-to (source message))))))
 
 (defvar *cliki-nickserv-password* "")
 
