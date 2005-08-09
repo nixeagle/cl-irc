@@ -227,7 +227,9 @@
                         (push e max-score-items)))))
           (advice-db))
     (if (zerop max-score)
-        "You can't expect automated advice for everything."
+        (progn
+	  (signal 'lookup-failure)
+	  "You can't expect automated advice for everything.")
         (let ((item (random-element max-score-items)))
           (format nil "#~A: ~A" (car item) (cdr item))))))
 
@@ -284,6 +286,8 @@
 	  (http-get-recursively (cdr (assoc :location headers))))
 	(list status headers stream))))
 
+(define-condition lookup-failure (condition) ())
+
 (defun cliki-first-sentence (term)
   (let* ((cliki-url (format nil "http://www.cliki.net/~A"
 			     (encode-for-url term)))
@@ -320,9 +324,15 @@
 				 (when (scan "^([^.]|\\.\\S)+[.?!]$" first-line)
 				   (setf first-line (concatenate 'string first-line " " cliki-url))
 				   (return-from cliki-return first-line))))
-			  (format nil "No definition was found in the first 5 lines of ~A" cliki-url)))
+			  (progn
+			    (signal 'lookup-failure)
+			    (format nil "No definition was found in the first 5 lines of ~A" cliki-url))))
 		 (if stream (close stream)))))
-	 (condition (c &rest whatever) (return-from cliki-return (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " ")))))
+	 #+sbcl
+	 (sb-ext:timeout (c)
+	   (return-from cliki-return (progn (signal 'lookup-failure)
+					    "I can't be expected to work when CLiki doesn't respond to me, can I?")))
+	 (serious-condition (c &rest whatever) (return-from cliki-return (progn (signal 'lookup-failure) (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " "))))))
      ))
 
 (defun shorten (url)
@@ -494,7 +504,7 @@
               )))))))))
     
 (defun cliki-lookup (term-with-question &key sender channel)
-  (let ((first-pass (regex-replace-all "^(\\s*)([^?]+)([?.!,;]*)$" term-with-question "\\2"))
+  (let ((first-pass (regex-replace-all "^(\\s*)(.*[^?.!,;])([?.!,;]*)$" term-with-question "\\2"))
         (should-send-cant-find t))
     (setf first-pass (regex-replace-all "\\s\\s+" first-pass " "))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
@@ -586,7 +596,7 @@
                             (nth-value 1 (scan-to-strings "^(?i)(direct|tell|show|inform|teach|give)\\s+(\\S+)\\s+(about|on|in|to|through|for|some|)\\s*(.+)$" first-pass))
                             (cons :forward it))
                            (aif
-                            (nth-value 1 (scan-to-strings "^(?i)(look\\s+up\\s+|)\\s*(.+)\\s+(for|to|at)\\s+(\\S+)$" first-pass))
+                            (nth-value 1 (scan-to-strings "^(?i)(look\\s+up\\s+|say|)\\s*(.+)\\s+(for|to|at)\\s+(\\S+)$" first-pass))
                             (cons :backward it))
                            )))
                      (if strings
@@ -599,30 +609,39 @@
                                 (person (if (string-equal person "me")
                                             (or sender channel "you")
                                             person))
-                                (about (cliki-lookup term :sender sender
-                                                    :channel channel)))
+				(do-concatenate t)
+                                (about
+				 (handler-bind
+				     ((lookup-failure
+				       #'(lambda (c)
+					   (setf do-concatenate nil))))
+				     (cliki-lookup term :sender sender
+                                                    :channel channel))))
                            (if about
-                               (format nil "~A: ~A~A"
-                                       person
-                                       (if (scan "http:" about)
-                                           (concatenate 'string
-                                                        (random-element
-                                                         '("have a look at"
-                                                           "please look at"
-                                                           "please see"
-                                                           "direct your attention towards"
-                                                           "look at"))
-                                                        " ")
-                                           "")
-                                       about)
+			       (if do-concatenate
+				   (format nil "~A: ~A~A"
+					   person
+					   (if (scan "http:" about)
+					       (concatenate 'string
+							    (random-element
+							     '("have a look at"
+							       "please look at"
+							       "please see"
+							       "direct your attention towards"
+							       "look at"))
+							    " ")
+					       "")
+					   about)
+				   about)
                                (setf should-send-cant-find nil)))))
                    (if (scan "^(?i)hello(\\s|$)*" first-pass) "what's up?")
                    (if (scan "^(?i)hi(\\s|$)*" first-pass) "what's up?")
                    (if (scan "^(?i)yo(\\s|$)*" first-pass) "what's up?")
                    (if (scan "^(?i)thank(s| you)(\\s|!|\\?|\\.|$)*" first-pass)
-                       (if sender
-                           (format nil "~A: you failed the inverse turing test!" sender)
-                           "you failed the inverse turing test!"))
+		       (random-element
+			'("you're welcome"
+			  "no problem"
+			  "np")))
                    (if (scan "^(?i)version(\\s|!|\\?|\\.|$)*" first-pass)
                        (format nil "This is the minion bot, running on a ~A (~A) and running under ~A ~A." (machine-type) (machine-version) (lisp-implementation-type) (lisp-implementation-version)))
                    (if (scan "^(?i)(?i)do my bidding!*$" first-pass) "Yes, my master.")
@@ -675,6 +694,7 @@
                          (do-eliza first-pass))
                        )
                    (when should-send-cant-find
+		     (signal 'lookup-failure)
                      (format nil "Sorry, I couldn't find anything in the database for ``~A''.~A" first-pass (if (scan " " first-pass) " Maybe you meant to end with punctuation?" "")))
                    ))))))))
 

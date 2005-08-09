@@ -68,6 +68,9 @@
     (elisp-lookup "elisp" "GNU Emacs Lisp Reference Manual")
     (clim-lookup "clim" "Common Lisp Interface Manager II Specification")))
 
+(defvar *spaces-allowed*
+  '(clim-lookup))
+
 (defvar *alists* nil)
 
 (defun add-simple-alist-lookup (file designator prefix description)
@@ -130,7 +133,8 @@
               do
               (aif (strip-address to-lookup :address (second type) :final t)
                    (let ((looked-up (funcall actual-fun it)))
-                     (if (and (<= 0 (count #\space it) 1)
+                     (if (and (<= 0 (count #\space it)
+				  (if (member actual-fun *spaces-allowed*) 1 0)1)
                               (not looked-up))
                          (setf looked-up (format nil "Sorry, I couldn't find anything for ~A."  it)))
                      (and looked-up
