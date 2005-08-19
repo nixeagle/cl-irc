@@ -96,4 +96,5 @@
  (11964
   . "I guess this just goes to show that you can lead a horse to water, but you can't make him drink it.")
  (11999 . "You are a stupid asshole.  Shut the fuck up.")
- (12000 . "Looking for a compiler bug is the second-to-last resort. The last resort is blaming bad RAM. It's never the correct hypothesis."))
+ (12000 . "Looking for a compiler bug is the second-to-last resort. The last resort is blaming bad RAM. It's never the correct hypothesis.")
+ (12017 . "It doesn't need to be portable, it just needs to work on your system."))
