@@ -332,6 +332,9 @@
 	 (sb-ext:timeout (c)
 	   (return-from cliki-return (progn (signal 'lookup-failure)
 					    "I can't be expected to work when CLiki doesn't respond to me, can I?")))
+	 (trivial-sockets:socket-error (c)
+	   (return-from cliki-return (progn (signal 'lookup-failure)
+					    "I can't be expected to work when CLiki doesn't respond to me, can I?")))
 	 (serious-condition (c &rest whatever) (return-from cliki-return (progn (signal 'lookup-failure) (regex-replace-all "\\n" (format nil "An error was encountered in lookup: ~A." c) " "))))))
      ))
 
@@ -508,7 +511,7 @@
         (should-send-cant-find t))
     (setf first-pass (regex-replace-all "\\s\\s+" first-pass " "))
     (setf first-pass (regex-replace-all "\\s*$" first-pass ""))
-    (let ((scanned (or (nth-value 1 (scan-to-strings "^add\\s+\"([^\"]+)\"\\s+as:*\\s+(.+)$" first-pass))
+    (let ((scanned (or (nth-value 1 (scan-to-strings "^add\\s+\"(.+)\"\\s+as:*\\s+(.+)$" first-pass))
                        (nth-value 1 (scan-to-strings "^add\\s+(.+)\\s+as:*\\s+(.+)$" first-pass)))))
       (if scanned
           (let ((term (elt scanned 0))
