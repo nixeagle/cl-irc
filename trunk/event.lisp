@@ -163,11 +163,10 @@ objects in sync."))
          (channel (or (find-channel connection (trailing-argument message))
                       (make-channel connection
                                     :name (trailing-argument message)))))
-    (if (self-message-p message)
-        (add-channel connection channel)
-        (progn
-          (add-user connection user)
-          (add-user channel user)))))
+    (when (self-message-p message)
+      (add-channel connection channel))
+    (add-user connection user)
+    (add-user channel user)))
 
 (defmethod default-hook ((message irc-topic-message))
   (setf (topic (find-channel (connection message)
@@ -229,9 +228,9 @@ objects in sync."))
                    target mode-name value))))))
 
 (defmethod default-hook ((message irc-nick-message))
-  (let ((con (connection message)))
-    (change-nickname con (find-user con (source message))
-                     (trailing-argument message))))
+  (let* ((con (connection message))
+         (user (find-or-create-user con (source message))))
+    (change-nickname con user (trailing-argument message))))
 
 (defmethod default-hook ((message irc-kick-message))
   (let* ((connection (connection message))
