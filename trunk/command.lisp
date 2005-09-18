@@ -241,6 +241,7 @@ registered."
 (defun connect (&key (nickname *default-nickname*)
                      (username nil)
                      (realname nil)
+                     (password nil)
                      (mode 0)
                      (server *default-irc-server*)
                      (port *default-irc-server-port*)
@@ -255,6 +256,8 @@ registered."
                           :username username
                           :realname realname)))
     (setf (user connection) user)
+    (unless (null password)
+      (pass connection password))
     (nick connection nickname)
     (user- connection (or username nickname) mode (or realname nickname))
     (add-default-hooks connection)
