@@ -185,12 +185,13 @@ this stream.")
 (defgeneric case-map-name (connection))
 (defgeneric re-apply-case-mapping (connection))
 
-(defun make-connection (&key (user nil)
+(defun make-connection (&key (connection-type 'connection)
+                             (user nil)
                              (server-name "")
                              (server-stream nil)
                              (client-stream t)
                              (hooks nil))
-  (let ((connection (make-instance 'connection
+  (let ((connection (make-instance connection-type
                                    :user user
                                    :server-name server-name
                                    :server-stream server-stream
@@ -772,12 +773,21 @@ may be already be on."
 
 (defmethod find-or-make-user ((connection connection) nickname &key (username "")
                               (hostname "") (realname ""))
-  (or (find-user connection nickname)
-      (make-user connection
-                 :nickname nickname
-                 :username username
-                 :hostname hostname
-                 :realname realname)))
+  (let ((user (find-user connection nickname)))
+    (unless user
+      (setf user
+            (make-user connection
+                       :nickname nickname
+                       :username username
+                       :hostname hostname
+                       :realname realname)))
+    (labels ((update-slot-if-known (slotname value)
+               (when (string= (slot-value user slotname) "")
+                 (setf (slot-value user slotname) value))))
+      (update-slot-if-known 'username username)
+      (update-slot-if-known 'hostname hostname)
+      (update-slot-if-known 'realname realname))
+    user))
 
 (defmethod change-nickname ((connection connection) (user user) new-nickname)
   (let ((new-user user)

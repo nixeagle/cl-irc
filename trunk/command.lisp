@@ -245,10 +245,12 @@ registered."
                      (mode 0)
                      (server *default-irc-server*)
                      (port *default-irc-server-port*)
+                     (connection-type 'connection)
                      (logging-stream t))
   "Connect to server and return a connection object."
   (let* ((stream (socket-connect server port))
-         (connection (make-connection :server-stream stream
+         (connection (make-connection :connection-type connection-type
+                                      :server-stream stream
                                       :client-stream logging-stream
                                       :server-name server))
          (user (make-user connection

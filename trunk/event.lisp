@@ -229,7 +229,9 @@ objects in sync."))
 
 (defmethod default-hook ((message irc-nick-message))
   (let* ((con (connection message))
-         (user (find-or-create-user con (source message))))
+         (user (find-or-make-user con (source message)
+                                  :hostname (host message)
+                                  :username (user message))))
     (change-nickname con user (trailing-argument message))))
 
 (defmethod default-hook ((message irc-kick-message))
