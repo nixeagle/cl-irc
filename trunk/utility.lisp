@@ -319,18 +319,21 @@ It returns a list of mode-description records."
             (unless (position this-op "+-")
               (throw 'illegal-mode-spec nil))
             (dotimes (i (length modes))
-              (let* ((mode-rec
-                      (mode-description connection target
-                                        (mode-name-from-char connection target
-                                                             (char modes i))))
-                     (param-p (funcall param-req mode-rec)))
-                (when (and param-p
-                           (= 0 (length arguments)))
-                  (throw 'illegal-mode-spec nil))
-                (push (list this-op
-                            (mode-desc-symbol mode-rec)
-                            (when param-p
-                              (if (mode-desc-nick-param-p mode-rec)
-                                  (find-user connection (pop arguments))
-                                (pop arguments)))) ops)))))))))
+              (case (char modes i)
+                ((#\+ #\-) (setf this-op (char modes i)))
+                (t 
+                 (let* ((mode-rec
+                         (mode-description connection target
+                                           (mode-name-from-char connection target
+                                                                (char modes i))))
+                        (param-p (funcall param-req mode-rec)))
+                   (when (and param-p
+                              (= 0 (length arguments)))
+                     (throw 'illegal-mode-spec nil))
+                   (push (list this-op
+                               (mode-desc-symbol mode-rec)
+                               (when param-p
+                                 (if (mode-desc-nick-param-p mode-rec)
+                                     (find-user connection (pop arguments))
+                                     (pop arguments)))) ops)))))))))))
 
