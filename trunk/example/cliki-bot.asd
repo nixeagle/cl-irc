@@ -28,5 +28,6 @@
     :components ((:file "mp2eliza")
                  (:file "eliza-rules"
                         :depends-on ("mp2eliza"))
+		 (:file "steel-bazooka")
                  (:file "cliki"
-                        :depends-on ("mp2eliza"))))
+                        :depends-on ("mp2eliza" "steel-bazooka"))))

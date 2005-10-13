@@ -675,6 +675,13 @@
                    (let ((str (nth-value 1 (scan-to-strings "^(?i)advice\\W+(\\d+)$" first-pass))))
                      (and str
                           (lookup-advice (elt str 0))))
+		   (let ((str (nth-value 1 (scan-to-strings "^(?i)what\\s+does\\s+([a-zA-Z]+)\\s+(mean|stand\\s+for)$" first-pass))))
+		     (and str
+			  (let ((letters (elt str 0)))
+			    (if (and (> (length letters) 2)
+				     (string-equal (subseq letters (- (length letters) 2)) "cl"))
+				(steel-bazooka:steel-whatever :letters (string-downcase (subseq letters 0 (- (length letters) 2))))
+				(steel-bazooka:steel-whatever :letters (string-downcase letters) :suffix nil)))))
                    (let ((str (nth-value 1 (scan-to-strings "^(?i)shorten\\s+(\\w+://.+\\S)\\s*$" term-with-question))))
                      (and str
                           (shorten (elt str 0))))
