@@ -407,7 +407,10 @@
               (format nil "Try saying something like ``~A: advice #11904'' to get some advice." nick)))
     ("apropos" .
      ,(lambda (nick)
-              (format nil "Try ``~A: apropos foo'' to search for all small definitions containing ''foo''." nick)))))
+              (format nil "Try ``~A: apropos foo'' to search for all small definitions containing ''foo''." nick)))
+    ("acronyms" .
+     ,(lambda (nick)
+	(format nil "See an acronym you don't recognize? Try ``~A: what does sbcl stand for?'' to find out what it means!" nick)))))
 
 (defun cliki-bot-help (nick)
   (format nil "There are multiple help modules. Try ``/msg ~A help kind'', where kind is one of: ~{\"~A\"~^, ~}."
