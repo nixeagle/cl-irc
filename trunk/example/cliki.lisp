@@ -680,10 +680,10 @@
                           (lookup-advice (elt str 0))))
 		   (let ((str
 			  (or
-			   (nth-value 1 (scan-to-strings "^(?i)what\\s+does\\s+([a-zA-Z]+)\\s+(mean|stand\\s+for)$" first-pass))
-			   (nth-value 1 (scan-to-strings "^(?i)what\\s+([a-zA-Z]+)\\s+(means|stands\\s+for)$" first-pass)))))
+			   (nth-value 1 (scan-to-strings "^(?i)what\\s+does\\s+([a-zA-Z\"]+)\\s+(mean|stand\\s+for)$" first-pass))
+			   (nth-value 1 (scan-to-strings "^(?i)what\\s+([a-zA-Z\"]+)\\s+(means|stands\\s+for)$" first-pass)))))
 		     (and str
-			  (let ((letters (elt str 0)))
+			  (let ((letters (remove #\" (elt str 0))))
 			    (if (and (> (length letters) 2)
 				     (string-equal (subseq letters (- (length letters) 2)) "cl"))
 				(steel-bazooka:steel-whatever :letters (string-downcase (subseq letters 0 (- (length letters) 2))))
