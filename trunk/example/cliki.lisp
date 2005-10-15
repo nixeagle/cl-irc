@@ -433,40 +433,44 @@
 
 (defparameter *last-warning-time* 0)
 
+(defmacro without-abuse (&body body)
+  `(flet ((doit () ,@body))
+     (if (> (- (get-universal-time) 60)
+	    *last-warning-time*)
+	 (let ((time-6 (first *last-eliza-times*))
+	       (time-4 (third *last-eliza-times*))
+	       (time-2 (fifth *last-eliza-times*))
+	       (current-time (get-universal-time))
+	       (count 0)
+	       (overload 0))
+	   (if (or
+		(and
+		 (< (- current-time 60)
+		    time-2)
+		 (setf count 3)
+		 (setf overload (- current-time time-2)))
+		(and
+		 (< (- current-time 75)
+		    time-4)
+		 (setf count 5)
+		 (setf overload (- current-time time-4)))
+		(and
+		 (< (- current-time 90)
+		    time-6)
+		 (setf count 7)
+		 (setf overload (- current-time time-6))))
+	       (progn
+		 (setf *last-warning-time* (get-universal-time))
+		 (format nil "Would you /please/ stop playing with me? ~A messages in ~A seconds is too many." count overload))
+	       (progn
+		 (setf *last-eliza-times* (nconc (cdr *last-eliza-times*)
+						 (list (get-universal-time))))
+		 (doit))
+	       
+	     )))))
+
 (defun do-eliza (first-pass)
-  (if (> (- (get-universal-time) 60)
-         *last-warning-time*)
-      (let ((time-6 (first *last-eliza-times*))
-            (time-4 (third *last-eliza-times*))
-            (time-2 (fifth *last-eliza-times*))
-            (current-time (get-universal-time))
-            (count 0)
-            (overload 0))
-        (if (or
-             (and
-              (< (- current-time 60)
-                 time-2)
-              (setf count 3)
-              (setf overload (- current-time time-2)))
-             (and
-              (< (- current-time 75)
-                 time-4)
-              (setf count 5)
-              (setf overload (- current-time time-4)))
-             (and
-              (< (- current-time 90)
-                 time-6)
-              (setf count 7)
-              (setf overload (- current-time time-6))))
-            (progn
-              (setf *last-warning-time* (get-universal-time))
-              (format nil "Would you /please/ stop playing with me? ~A messages in ~A seconds is too many." count overload))
-            (progn
-              (setf *last-eliza-times* (nconc (cdr *last-eliza-times*)
-                                              (list (get-universal-time))))
-              (ignore-errors (eliza::eliza first-pass)))
-            
-            ))))
+  (without-abuse (ignore-errors (eliza::eliza first-pass))))
 
 (defvar *more* "CODE")
 
@@ -685,11 +689,12 @@
 		     (and str
 			  (let ((letters (remove #\" (elt str 0))))
 			    (when (< (length letters) 9)
-			      (if (and (> (length letters) 2)
-				       (string-equal (subseq letters (- (length letters) 2)) "cl"))
-				  (steel-bazooka:steel-whatever :letters (string-downcase (subseq letters 0 (- (length letters) 2))))
-				  (steel-bazooka:steel-whatever :letters (string-downcase letters) :suffix nil))))))
-                   (let ((str (nth-value 1 (scan-to-strings "^(?i)shorten\\s+(\\w+://.+\\S)\\s*$" term-with-question))))
+			      (without-abuse
+				  (if (and (> (length letters) 2)
+					   (string-equal (subseq letters (- (length letters) 2)) "cl"))
+				      (steel-bazooka:steel-whatever :letters (string-downcase (subseq letters 0 (- (length letters) 2))))
+				      (steel-bazooka:steel-whatever :letters (string-downcase letters) :suffix nil)))))))
+		   (let ((str (nth-value 1 (scan-to-strings "^(?i)shorten\\s+(\\w+://.+\\S)\\s*$" term-with-question))))
                      (and str
                           (shorten (elt str 0))))
                    (if (should-do-lookup first-pass (or channel sender ""))
