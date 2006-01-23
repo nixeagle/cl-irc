@@ -241,26 +241,13 @@ input."
     (and (streamp stream)
          (open-stream-p stream))))
 
-(define-condition invalidate-me (condition)
-  ((stream :initarg :stream
-           :reader invalidate-me-stream)
-   (condition :initarg :condition
-              :reader invalidate-me-condition)))
-
 (defmethod read-message ((connection connection))
-  (let ((read-more-p t))
-    (handler-case
-        (progn
-          (when (and (connectedp connection) read-more-p)
-            (let ((message (read-irc-message connection)))
-              (when *debug-p*
-                (format *debug-stream* "~A" (describe message)))
-              (irc-message-event message)
-              message))) ; needed because of the "loop while" in read-message-loop
-        (stream-error (c) (setf read-more-p nil)
-                    (signal 'invalidate-me :stream
-                            (server-stream connection)
-                            :condition c)))))
+  (when (connectedp connection)
+    (let ((message (read-irc-message connection)))
+      (when *debug-p*
+        (format *debug-stream* "~A" (describe message)))
+      (irc-message-event message)
+      message))) ; needed because of the "loop while" in read-message-loop
 
 (defvar *process-count* 0)
 
@@ -284,14 +271,15 @@ irc-message-event on them. Returns background process ID if available."
 			      (server-stream connection))
 			     :input (lambda (fd)
 				      (declare (ignore fd))
-                                      (handler-case
+                                      (if (listen (server-stream connection))
                                           (read-message connection)
-                                        (invalidate-me (c)
-                                          (sb-sys:invalidate-descriptor
-                                           (sb-sys:fd-stream-fd
-                                            (invalidate-me-stream c)))
-                                          (format t "Socket closed: ~A~%"
-                                                  (invalidate-me-condition c)))))))))
+                                        ;; select() returns with no
+                                        ;; available data if the stream
+                                        ;; has been closed on the other
+                                        ;; end (EPIPE)
+                                        (sb-sys:invalidate-descriptor
+                                         (sb-sys:fd-stream-fd
+                                          (server-stream connection)))))))))
 
 (defun stop-background-message-handler (process)
   "Stops a background message handler process returned by the start function."
