@@ -343,6 +343,9 @@ registered."
 (defmethod ctcp ((connection connection) target message)
   (send-irc-message connection :privmsg (make-ctcp-message message) target))
 
+#|
+There's too much wrong with this method to fix it now.
+
 (defmethod ctcp-chat-initiate ((connection connection) (nickname string))
   #+sbcl
   (let ((socket (sb-bsd-sockets:make-inet-socket :stream :tcp))
@@ -359,3 +362,4 @@ registered."
                          :socket socket))
   #-sbcl (warn "ctcp-chat-initiate is not supported on this implementation.")
   )
+|#

@@ -292,7 +292,7 @@ objects in sync."))
 ;  (when (automatically-accept-dcc-connections (configuration (connection message)))
 ;    (let* ((user (find-user (connection message) (source message)))
 ;           (args (tokenize-string (trailing-argument message)))
-;           (remote-address (hbo-to-vector-quad (parse-integer (fourth args))))
+;           (remote-address (hbo-to-dotted-quad (parse-integer (fourth args))))
 ;           (remote-port (parse-integer (fifth args) :junk-allowed t)))
 ;      (push (make-dcc-connection :user user
 ;                                 :remote-address remote-address
@@ -306,7 +306,7 @@ objects in sync."))
 ;    (let* ((user (find-user (connection message) (source message)))
 ;           (args (tokenize-string (trailing-argument message)))
 ;           (filename (third args))
-;           (remote-address (hbo-to-vector-quad (parse-integer (fourth args))))
+;           (remote-address (hbo-to-dotted-quad (parse-integer (fourth args))))
 ;           (remote-port (parse-integer (fifth args)))
 ;           (filesize (parse-integer (sixth args) :junk-allowed t)))
 ;      (let ((dcc-connection (make-dcc-connection :user user

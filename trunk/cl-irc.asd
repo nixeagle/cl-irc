@@ -16,10 +16,7 @@
     :version "0.5.2"
     :licence "MIT"
     :description "Common Lisp interface to the IRC protocol"
-    :depends-on
-      #+sbcl (:sb-bsd-sockets :split-sequence)
-      #-sbcl (:split-sequence)
-    :depends-on (:split-sequence)
+    :depends-on (:split-sequence :trivial-sockets)
     :properties ((#:author-email . "cl-irc-devel@common-lisp.net")
                  (#:date . "$Date$")
                  ((#:albert #:output-dir) . "doc/api-doc/")

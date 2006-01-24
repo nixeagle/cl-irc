@@ -400,7 +400,7 @@ user at this end can be reached via your normal connection object.")
                                  (output-stream t))
   (make-instance 'dcc-connection
                  :user user
-                 :stream (socket-stream remote-address remote-port)
+                 :stream (socket-connect remote-address remote-port)
                  :output-stream output-stream))
 
 (defgeneric dcc-close (connection))
