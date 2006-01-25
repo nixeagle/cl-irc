@@ -141,8 +141,8 @@ registered."
       (send-irc-message connection :quit message)
     #+(and sbcl (not sb-thread))
     (sb-sys:invalidate-descriptor (sb-sys:fd-stream-fd
-                                   (server-stream connection)))
-    (close (server-stream connection))))
+                                   (network-stream connection)))
+    (close (network-stream connection))))
 
 (defmethod squit ((connection connection) (server string) (comment string))
   (send-irc-message connection :squit comment server))
@@ -250,7 +250,7 @@ registered."
   "Connect to server and return a connection object."
   (let* ((stream (socket-connect server port))
          (connection (make-connection :connection-type connection-type
-                                      :server-stream stream
+                                      :network-stream stream
                                       :client-stream logging-stream
                                       :server-name server))
          (user (make-user connection

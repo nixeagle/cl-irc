@@ -114,9 +114,9 @@ user class.")))
     :initarg :server-name
     :accessor server-name
     :initform "Unknown server")
-   (server-stream
-    :initarg :server-stream
-    :accessor server-stream
+   (network-stream
+    :initarg :network-stream
+    :accessor network-stream
     :documentation "Stream used to talk to the IRC server.")
    (server-capabilities
     :initform *default-isupport-values*
@@ -188,13 +188,13 @@ this stream.")
 (defun make-connection (&key (connection-type 'connection)
                              (user nil)
                              (server-name "")
-                             (server-stream nil)
+                             (network-stream nil)
                              (client-stream t)
                              (hooks nil))
   (let ((connection (make-instance connection-type
                                    :user user
                                    :server-name server-name
-                                   :server-stream server-stream
+                                   :network-stream network-stream
                                    :client-stream client-stream)))
     (dolist (hook hooks)
       (add-hook connection (car hook) (cadr hook)))
@@ -237,7 +237,7 @@ this stream.")
 (defmethod connectedp ((connection connection))
   "Returns t if `connection' is connected to a server and is ready for
 input."
-  (let ((stream (server-stream connection)))
+  (let ((stream (network-stream connection)))
     (and (streamp stream)
          (open-stream-p stream))))
 
@@ -268,10 +268,10 @@ irc-message-event on them. Returns background process ID if available."
       (start-process #'do-loop name)
       #+(and sbcl (not sb-thread))
       (sb-sys:add-fd-handler (sb-sys:fd-stream-fd
-                              (server-stream connection))
+                              (network-stream connection))
                              :input (lambda (fd)
                                       (declare (ignore fd))
-                                      (if (listen (server-stream connection))
+                                      (if (listen (network-stream connection))
                                           (read-message connection)
                                         ;; select() returns with no
                                         ;; available data if the stream
@@ -279,7 +279,7 @@ irc-message-event on them. Returns background process ID if available."
                                         ;; end (EPIPE)
                                         (sb-sys:invalidate-descriptor
                                          (sb-sys:fd-stream-fd
-                                          (server-stream connection)))))))))
+                                          (network-stream connection)))))))))
 
 (defun stop-background-message-handler (process)
   "Stops a background message handler process returned by the start function."
@@ -296,7 +296,7 @@ irc-message-event on them. Returns background process ID if available."
 (defmethod read-irc-message ((connection connection))
   "Read and parse an IRC-message from the `connection'."
   (let ((message (create-irc-message
-                  (read-line (server-stream connection) t))))
+                  (read-line (network-stream connection) t))))
     (setf (connection message) connection)
     message))
 
@@ -307,8 +307,8 @@ server, via the `connection'."
   (let ((raw-message (make-irc-message command
                                        :arguments arguments
                                        :trailing-argument trailing-argument)))
-    (write-sequence raw-message (server-stream connection))
-    (force-output (server-stream connection))
+    (write-sequence raw-message (network-stream connection))
+    (force-output (network-stream connection))
     raw-message))
 
 (defmethod get-hooks ((connection connection) (class symbol))
@@ -379,7 +379,7 @@ server, via the `connection'."
 user at this end can be reached via your normal connection object.")
    (stream
     :initarg :stream
-    :accessor dcc-stream)
+    :accessor network-stream)
    (output-stream
     :initarg :output-stream
     :accessor output-stream
@@ -407,7 +407,7 @@ user at this end can be reached via your normal connection object.")
 (defgeneric send-dcc-message (connection message))
 
 (defmethod read-message ((connection dcc-connection))
-  (let ((message (read-line (dcc-stream connection))))
+  (let ((message (read-line (network-stream connection))))
     (format (output-stream connection) "~A~%" message)
     (force-output (output-stream connection))
     message))
@@ -416,20 +416,21 @@ user at this end can be reached via your normal connection object.")
   (loop while (read-message connection)))
 
 (defmethod send-dcc-message ((connection dcc-connection) message)
-  (format (dcc-stream connection) "~A~%" message))
+  (format (network-stream connection) "~A~%" message)
+  (force-output (network-stream connection)))
 
 ;; argh.  I want to name this quit but that gives me issues with
 ;; generic functions.  need to resolve.
 (defmethod dcc-close ((connection dcc-connection))
   #+(and sbcl (not sb-thread))
   (sb-sys:invalidate-descriptor (sb-sys:fd-stream-fd (stream connection)))
-  (close (dcc-stream connection))
+  (close (network-stream connection))
   (setf (user connection) nil)
   (setf *dcc-connections* (remove connection *dcc-connections*))
   )
 
 (defmethod connectedp ((connection dcc-connection))
-  (let ((stream (dcc-stream connection)))
+  (let ((stream (network-stream connection)))
     (and (streamp stream)
          (open-stream-p stream))))
 

@@ -38,7 +38,7 @@
              :modes
              :user-count
              :users
-             :server-stream
+             :network-stream
              :client-stream
              :channels
              :add-hook
