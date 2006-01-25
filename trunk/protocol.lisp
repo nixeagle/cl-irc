@@ -171,8 +171,6 @@ this stream.")
 (defgeneric connectedp (connection))
 (defgeneric read-message (connection))
 (defgeneric start-process (function name))
-(defgeneric start-background-message-handler (connection))
-(defgeneric read-message-loop (connection))
 (defgeneric read-irc-message (connection))
 (defgeneric send-irc-message (connection command
                              &optional trailing-argument &rest arguments))
@@ -259,7 +257,7 @@ input."
   #+openmcl (ccl:process-run-function name function)
   #+armedbear (ext:make-thread function))
 
-(defmethod start-background-message-handler ((connection connection))
+(defun start-background-message-handler (connection)
   "Read messages from the `connection', parse them and dispatch
 irc-message-event on them. Returns background process ID if available."
   (flet ((do-loop () (read-message-loop connection)))
@@ -290,7 +288,7 @@ irc-message-event on them. Returns background process ID if available."
     #+openmcl (ccl:process-kill process)
     #+armedbear (ext:destroy-thread process))
 
-(defmethod read-message-loop ((connection connection))
+(defun read-message-loop (connection)
   (loop while (read-message connection)))
 
 (defmethod read-irc-message ((connection connection))
@@ -377,8 +375,8 @@ server, via the `connection'."
     :accessor user
     :documentation "The user at the other end of this connection.  The
 user at this end can be reached via your normal connection object.")
-   (stream
-    :initarg :stream
+   (network-stream
+    :initarg :network-stream
     :accessor network-stream)
    (output-stream
     :initarg :output-stream
@@ -400,20 +398,21 @@ user at this end can be reached via your normal connection object.")
                                  (output-stream t))
   (make-instance 'dcc-connection
                  :user user
-                 :stream (socket-connect remote-address remote-port)
+                 :network-stream (socket-connect remote-address remote-port)
                  :output-stream output-stream))
 
 (defgeneric dcc-close (connection))
 (defgeneric send-dcc-message (connection message))
 
 (defmethod read-message ((connection dcc-connection))
-  (let ((message (read-line (network-stream connection))))
-    (format (output-stream connection) "~A~%" message)
-    (force-output (output-stream connection))
-    message))
-
-(defmethod read-message-loop ((connection dcc-connection))
-  (loop while (read-message connection)))
+  (when (connectedp connection)
+    (let ((message (read-line (network-stream connection))))
+      (format (output-stream connection) "~A~%" message)
+      (force-output (output-stream connection))
+      (when *debug-p*
+        (format *debug-stream* "~A" (describe message)))
+      ;; (dcc-message-event message)
+      message))) ; needed because of the "loop while" in read-message-loop
 
 (defmethod send-dcc-message ((connection dcc-connection) message)
   (format (network-stream connection) "~A~%" message)
