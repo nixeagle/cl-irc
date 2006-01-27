@@ -5,12 +5,13 @@
 
 (in-package :irc)
 
-(defgeneric irc-message-event (message)
+(defgeneric irc-message-event (connection message)
   (:documentation "Upon receipt of an IRC message from the
 connection's stream, irc-message-event will be called with the
 message."))
 
-(defmethod irc-message-event ((message irc-message))
+(defmethod irc-message-event (connection (message irc-message))
+  (declare (ignore connection))
   (apply-to-hooks message)
   (client-log (connection message) message "UNHANDLED-EVENT:"))
 
@@ -286,7 +287,8 @@ objects in sync."))
             (format nil "PING ~A" (trailing-argument message)))
    (source message)))
 
-(defmethod irc-message-event ((message ctcp-dcc-chat-request-message))
+(defmethod irc-message-event (connection (message ctcp-dcc-chat-request-message))
+  (declare (ignore connection))
   (apply-to-hooks message)
   (client-log (connection message) message))
 ;  (when (automatically-accept-dcc-connections (configuration (connection message)))
@@ -299,7 +301,8 @@ objects in sync."))
 ;                                 :remote-port remote-port)
 ;            *dcc-connections*))))
   
-(defmethod irc-message-event ((message ctcp-dcc-send-request-message))
+(defmethod irc-message-event (connection (message ctcp-dcc-send-request-message))
+  (declare (ignore connection))
   (apply-to-hooks message)
   (client-log (connection message) message))
 ;  (when (automatically-accept-dcc-downloads (configuration (connection message)))

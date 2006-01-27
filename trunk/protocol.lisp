@@ -244,7 +244,7 @@ input."
     (let ((message (read-irc-message connection)))
       (when *debug-p*
         (format *debug-stream* "~A" (describe message)))
-      (irc-message-event message)
+      (irc-message-event connection message)
       message))) ; needed because of the "loop while" in read-message-loop
 
 (defvar *process-count* 0)
