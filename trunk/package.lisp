@@ -12,6 +12,7 @@
     (:nicknames :irc)
     (:export :read-message-loop
              :read-message
+             :irc-message-event
              :start-background-message-handler
              :stop-background-message-handler
              :socket-connect
