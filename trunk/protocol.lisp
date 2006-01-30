@@ -244,7 +244,8 @@ input."
     (let ((message (read-irc-message connection)))
       (when *debug-p*
         (format *debug-stream* "~A" (describe message)))
-      (irc-message-event connection message)
+      (when message
+        (irc-message-event connection message))
       message))) ; needed because of the "loop while" in read-message-loop
 
 (defvar *process-count* 0)
@@ -293,10 +294,13 @@ irc-message-event on them. Returns background process ID if available."
 
 (defmethod read-irc-message ((connection connection))
   "Read and parse an IRC-message from the `connection'."
-  (let ((message (create-irc-message
-                  (read-line (network-stream connection) t))))
-    (setf (connection message) connection)
-    message))
+  (handler-case
+    (let ((message (create-irc-message
+                    (read-line (network-stream connection) t))))
+      (setf (connection message) connection)
+      message)
+    (end-of-file)))
+       ;; satisfy read-message-loop assumption of nil when no more messages
 
 (defmethod send-irc-message ((connection connection) command
                              &optional trailing-argument &rest arguments)
