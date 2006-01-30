@@ -1,7 +1,17 @@
 
   - Add DCC
 
-    - I would really like usocket first
+    minimally: CHAT (accept), GET
+
+    - We have (some) DCC, but no means to initiate a DCC connection:
+      trivial-sockets won't let us access the local ip-address associated
+      with the main IRC connection. Presumably, the DCC listener should
+      be bound to the same IP/interface.
+
+      After solving this, SEND and CHAT (initiate) can be implemented.
+
+    - In the process add configuration options for automatically accepting
+      DCC connections (both :send and :chat types)
 
   - If a message (as in PRIVMSG) is longer than 512 characters
   (including carriage return and linefeed) we should probably split
