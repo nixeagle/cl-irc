@@ -299,7 +299,7 @@ irc-message-event on them. Returns background process ID if available."
                     (read-line (network-stream connection) t))))
       (setf (connection message) connection)
       message)
-    (end-of-file)))
+    (end-of-file ())))
        ;; satisfy read-message-loop assumption of nil when no more messages
 
 (defmethod send-irc-message ((connection connection) command
