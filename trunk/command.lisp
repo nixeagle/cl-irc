@@ -19,7 +19,7 @@
 (defgeneric service (connection nickname distribution info))
 (defgeneric quit (connection &optional message))
 (defgeneric squit (connection server comment))
-(defgeneric join (connection channel))
+(defgeneric join (connection channel &key password))
 (defgeneric multi-join (connection channels))
 (defgeneric part (connection channel))
 (defgeneric part-all (connection))
@@ -147,11 +147,11 @@ registered."
 (defmethod squit ((connection connection) (server string) (comment string))
   (send-irc-message connection :squit comment server))
 
-(defmethod join ((connection connection) (channel string))
-  (send-irc-message connection :join nil channel))
+(defmethod join ((connection connection) (channel string) &key password)
+  (apply #'send-irc-message connection :join nil channel (when password (list password))))
 
-(defmethod join ((connection connection) (channel channel))
-  (join connection (name channel)))
+(defmethod join ((connection connection) (channel channel) &key password)
+  (join connection (name channel) :password password))
 
 ;; utility function not part of the RFC
 (defmethod multi-join ((connection connection) (channels list))
