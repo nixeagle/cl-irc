@@ -187,8 +187,10 @@ objects in sync."))
         (remove-user channel user))))
 
 (defmethod default-hook ((message irc-quit-message))
-  (let ((connection (connection message)))
-    (remove-user-everywhere connection (find-user connection (source message)))))
+  (let* ((connection (connection message))
+         (user (find-user connection (source message))))
+    (unless (null user)
+      (remove-user-everywhere connection user))))
 
 (defmethod default-hook ((message irc-rpl_channelmodeis-message))
   (destructuring-bind
