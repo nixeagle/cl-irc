@@ -10,7 +10,7 @@
 
 (defconstant +soh+ #.(code-char 1))
 
-(defparameter *version* "0.1.0")
+(defparameter *version* "0.8.0-dev")
 (defparameter *ctcp-version*
   (format nil "CL IRC library, cl-irc:~A:~A ~A"
           *version* (machine-type) (machine-version)))
