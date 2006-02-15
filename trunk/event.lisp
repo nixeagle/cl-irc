@@ -108,9 +108,11 @@ objects in sync."))
                                                 :user-count user-count))))))
 
 (defmethod default-hook ((message irc-rpl_topic-message))
-  (setf (topic (find-channel (connection message)
-                             (second (arguments message))))
-        (trailing-argument message)))
+  (destructuring-bind
+      (target channel topic)
+      (arguments message)
+    (declare (ignore target))
+    (setf (topic (find-channel (connection message) channel)) topic)))
 
 (defmethod default-hook ((message irc-rpl_namreply-message))
   (let* ((connection (connection message)))
@@ -159,32 +161,43 @@ objects in sync."))
   (apply #'pong (connection message) (arguments message)))
 
 (defmethod default-hook ((message irc-join-message))
-  (let* ((connection (connection message))
-         (user (find-or-make-user
-                (connection message)
-                (source message)
-                :hostname (host message)
-                :username (user message)))
-         (channel (or (find-channel connection (trailing-argument message))
-                      (make-channel connection
-                                    :name (trailing-argument message)))))
-    (when (self-message-p message)
-      (add-channel connection channel))
-    (add-user connection user)
-    (add-user channel user)))
+  (with-slots
+       (connection source host user arguments)
+       message
+    (destructuring-bind
+        (channel)
+        arguments
+      (let ((user (find-or-make-user connection source
+                                     :hostname host
+                                     :username user))
+            (channel (or (find-channel connection channel)
+                         (make-channel connection :name channel))))
+        (when (self-message-p message)
+          (add-channel connection channel))
+        (add-user connection user)
+        (add-user channel user)))))
 
 (defmethod default-hook ((message irc-topic-message))
-  (setf (topic (find-channel (connection message)
-                             (first (arguments message))))
-        (trailing-argument message)))
+  (with-slots
+       (connection arguments)
+       message
+    (destructuring-bind
+        (channel &optional topic)
+        arguments
+      (setf (topic (find-channel connection channel)) topic))))
 
 (defmethod default-hook ((message irc-part-message))
-  (let* ((connection (connection message))
-         (channel (find-channel connection (first (arguments message))))
-         (user (find-user connection (source message))))
-    (if (self-message-p message)
-        (remove-channel user channel)
-        (remove-user channel user))))
+  (with-slots
+      (connection arguments source)
+      message
+    (destructuring-bind
+        (channel &optional text)
+        arguments
+      (let ((channel (find-channel connection channel))
+            (user (find-user connection source)))
+        (if (self-message-p message)
+            (remove-channel user channel)
+          (remove-user channel user))))))
 
 (defmethod default-hook ((message irc-quit-message))
   (let* ((connection (connection message))
@@ -193,30 +206,34 @@ objects in sync."))
       (remove-user-everywhere connection user))))
 
 (defmethod default-hook ((message irc-rpl_channelmodeis-message))
-  (destructuring-bind
-      (target &rest arguments)
-      ;; ignore the my own nick which is the first message argument
-      (rest (arguments message))
-    (let* ((connection (connection message))
-           (target (find-channel connection target))
+  (with-slots
+      (connection arguments)
+      message
+    (destructuring-bind
+        (target channel &rest mode-arguments)
+        arguments
+    (declare (ignore target))
+    (let* ((channel (find-channel connection channel))
            (mode-changes
-            (when target
-              (parse-mode-arguments connection target arguments
+            (when channel
+              (parse-mode-arguments connection channel arguments
                                     :server-p (user connection)))))
       (dolist (change mode-changes)
         (destructuring-bind
             (op mode-name value)
             change
-          (unless (has-mode-p target mode-name)
+          (unless (has-mode-p channel mode-name)
             (add-mode target mode-name
-                      (make-mode connection target mode-name)))
+                      (make-mode connection channel mode-name)))
           (funcall (if (char= #\+ op) #'set-mode #'unset-mode)
-                   target mode-name value))))))
+                   channel mode-name value)))))))
 
 (defmethod default-hook ((message irc-mode-message))
   (destructuring-bind
       (target &rest arguments)
       (arguments message)
+    (print (arguments message))
+    (print arguments)
     (let* ((connection (connection message))
            (target (or (find-channel connection target)
                        (find-user connection target)))
@@ -235,22 +252,35 @@ objects in sync."))
                    target mode-name value))))))
 
 (defmethod default-hook ((message irc-nick-message))
-  (let* ((con (connection message))
-         (user (find-or-make-user con (source message)
-                                  :hostname (host message)
-                                  :username (user message))))
-    (change-nickname con user (trailing-argument message))))
+  (with-slots
+      (connection source host user arguments)
+      message
+    (destructuring-bind
+        (new-nick)
+        arguments
+      (let* ((user (find-or-make-user connection source
+                                      :hostname host
+                                      :username user)))
+        (change-nickname connection user new-nick)))))
 
 (defmethod default-hook ((message irc-kick-message))
-  (let* ((connection (connection message))
-         (channel (find-channel connection (first (arguments message))))
-         (user (find-user connection (second (arguments message)))))
-    (if (self-message-p message)
-        (remove-channel user channel)
-        (remove-user channel user))))
+  (with-slots
+      (connection arguments)
+      message
+    (destructuring-bind
+        (channel nick &optional reason)
+        arguments
+      (declare (ignore arguments))
+      (let* ((channel (find-channel connection channel))
+             (user (find-user connection nick)))
+        (if (self-message-p message)
+            (remove-channel user channel)
+          (remove-user channel user))))))
 
 (defmethod default-hook ((message ctcp-time-message))
-  (multiple-value-bind (second minute hour date month year day) (get-decoded-time)
+  (multiple-value-bind
+      (second minute hour date month year day)
+      (get-decoded-time)
     (send-irc-message
      (connection message)
      :notice (source message)

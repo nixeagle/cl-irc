@@ -292,9 +292,11 @@ It returns a list of mode-description records."
                          (mode-description connection target
                                            (mode-name-from-char connection target
                                                                 (char modes i))))
-                        (param-p (funcall param-req mode-rec)))
-                   (when (and param-p
-                              (= 0 (length arguments)))
+                        (param-p (when mode-rec
+                                   (funcall param-req mode-rec))))
+                   (when (or (null mode-rec)
+                             (and param-p
+                                  (= 0 (length arguments))))
                      (throw 'illegal-mode-spec nil))
                    (push (list this-op
                                (mode-desc-symbol mode-rec)
