@@ -251,20 +251,21 @@ objects in sync."))
   (multiple-value-bind (second minute hour date month year day) (get-decoded-time)
     (send-irc-message
      (connection message)
-     :notice (make-ctcp-message
-              (format nil "TIME ~A"
-                      (make-time-message second minute hour date month year day)))
-     (source message))))
+     :notice (source message)
+     (make-ctcp-message
+      (format nil "TIME ~A"
+              (make-time-message second minute hour date month year day))))))
 
 (defmethod default-hook ((message ctcp-source-message))
   (send-irc-message
    (connection message)
-   :notice (make-ctcp-message
-            (format nil "SOURCE ~A:~A:~A"
-                    *download-host*
-                    *download-directory*
-                    *download-file*))
-   (source message)))
+   :notice
+   (source message)
+   (make-ctcp-message
+    (format nil "SOURCE ~A:~A:~A"
+            *download-host*
+            *download-directory*
+            *download-file*))))
 
 (defmethod default-hook ((message ctcp-finger-message))
   (let* ((user (user (connection message)))
@@ -273,23 +274,23 @@ objects in sync."))
                           (nickname user))))
     (send-irc-message
      (connection message)
-     :notice (make-ctcp-message
-              (format nil "FINGER ~A" finger-info))
-     (source message))))
+     :notice (source message)
+     (make-ctcp-message
+      (format nil "FINGER ~A" finger-info)))))
 
 (defmethod default-hook ((message ctcp-version-message))
   (send-irc-message
    (connection message)
-   :notice (make-ctcp-message
-            (format nil "VERSION ~A" *ctcp-version*))
-   (source message)))
+   :notice (source message)
+   (make-ctcp-message
+    (format nil "VERSION ~A" *ctcp-version*))))
 
 (defmethod default-hook ((message ctcp-ping-message))
   (send-irc-message
    (connection message)
-   :notice (make-ctcp-message
-            (format nil "PING ~A" (trailing-argument message)))
-   (source message)))
+   :notice (source message)
+   (make-ctcp-message
+    (format nil "PING ~A" (trailing-argument message)))))
 
 (defmethod irc-message-event (connection (message ctcp-dcc-chat-request-message))
   (declare (ignore connection))

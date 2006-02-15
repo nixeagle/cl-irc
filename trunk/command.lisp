@@ -77,62 +77,62 @@ RPL_YOURESERVICE (for services) message indicating that the connection
 is now registered and known the to the entire IRC network.  The reply
 message MUST contain the full client identifier upon which it was
 registered."
-  (send-irc-message connection :pass nil password))
+  (send-irc-message connection :pass password))
 
 (defmethod nick ((connection connection) (new-nickname string))
-  (send-irc-message connection :nick nil new-nickname))
+  (send-irc-message connection :nick new-nickname))
 
 (defmethod user- ((connection connection) (username string)
                   (mode integer) &optional (realname ""))
-  (send-irc-message connection :user realname username mode "*"))
+  (send-irc-message connection :user username mode "*" realname))
 
 (defmethod oper ((connection connection) (name string) (password string))
-  (send-irc-message connection :oper nil name password))
+  (send-irc-message connection :oper name password))
 
 (defmethod mode ((connection connection) (nickname string) (mode string))
-  (send-irc-message connection :mode nil nickname mode))
+  (send-irc-message connection :mode nickname mode))
 
 ;; utility functions not part of the RFCs
 (defmethod op ((connection connection) (channel string) (nickname string))
-  (send-irc-message connection :mode nil channel "+o" nickname))
+  (send-irc-message connection :mode channel "+o" nickname))
 
 (defmethod op ((connection connection) (channel channel) (user user))
   (op connection (name channel) (nickname user)))
 
 (defmethod deop ((connection connection) (channel string) (nickname string))
-  (send-irc-message connection :mode nil channel "-o" nickname))
+  (send-irc-message connection :mode channel "-o" nickname))
 
 (defmethod deop ((connection connection) (channel channel) (user user))
   (deop connection (name channel) (nickname user)))
 
 (defmethod voice ((connection connection) (channel string) (nickname string))
-  (send-irc-message connection :mode nil channel "+v" nickname))
+  (send-irc-message connection :mode channel "+v" nickname))
 
 (defmethod voice ((connection connection) (channel channel) (user user))
   (voice connection (name channel) (nickname user)))
 
 (defmethod devoice ((connection connection) (channel string) (nickname string))
-  (send-irc-message connection :mode nil channel "-v" nickname))
+  (send-irc-message connection :mode channel "-v" nickname))
 
 (defmethod devoice ((connection connection) (channel channel) (user user))
   (devoice connection (name channel) (nickname user)))
 
 (defmethod ban ((connection connection) (channel string) (mask string))
-  (send-irc-message connection :mode nil channel "+b" mask))
+  (send-irc-message connection :mode channel "+b" mask))
 
 (defmethod ban ((connection connection) (channel channel) (mask string))
   (ban connection (name channel) mask))
 
 ;; unban or deban?
 (defmethod unban ((connection connection) (channel string) (mask string))
-  (send-irc-message connection :mode nil channel "-b" mask))
+  (send-irc-message connection :mode channel "-b" mask))
 
 (defmethod unban ((connection connection) (channel channel) (mask string))
   (unban connection (name channel) mask))
 
 (defmethod service ((connection connection) (nickname string)
                     (distribution string) (info string))
-  (send-irc-message connection :service info nickname "*" distribution 0 0 info))
+  (send-irc-message connection :service nickname "*" distribution 0 0 info))
 
 (defmethod quit ((connection connection) &optional (message *default-quit-message*))
   (remove-all-channels connection)
@@ -145,10 +145,11 @@ registered."
     (close (network-stream connection))))
 
 (defmethod squit ((connection connection) (server string) (comment string))
-  (send-irc-message connection :squit comment server))
+  (send-irc-message connection :squit server comment))
 
 (defmethod join ((connection connection) (channel string) &key password)
-  (apply #'send-irc-message connection :join nil channel (when password (list password))))
+  (apply #'send-irc-message
+         connection :join channel (when password (list password))))
 
 (defmethod join ((connection connection) (channel channel) &key password)
   (join connection (name channel) :password password))
@@ -159,7 +160,7 @@ registered."
     (join connection channel)))
 
 (defmethod part ((connection connection) (channel string))
-  (send-irc-message connection :part nil channel))
+  (send-irc-message connection :part channel))
 
 (defmethod part ((connection connection) (channel channel))
   (part connection (name channel)))
@@ -170,14 +171,14 @@ registered."
     (part connection (name channel))))
 
 (defmethod topic- ((connection connection) (channel string) (topic string))
-  (send-irc-message connection :topic topic channel))
+  (send-irc-message connection :topic channel topic))
 
 (defmethod topic- ((connection connection) (channel channel) (topic string))
   (topic- connection (name channel) topic))
 
 (defmethod names ((connection connection) (channel string)
                   &optional (target ""))
-  (send-irc-message connection :names nil channel target))
+  (send-irc-message connection :names channel target))
 
 (defmethod names ((connection connection) (channel channel)
                   &optional (target ""))
@@ -185,24 +186,24 @@ registered."
 
 (defmethod list- ((connection connection) &optional
                   (channel "") (target ""))
-  (send-irc-message connection :list nil channel target))
+  (send-irc-message connection :list channel target))
 
 (defmethod invite ((connection connection) (nickname string) (channel string))
-  (send-irc-message connection :invite nil nickname channel))
+  (send-irc-message connection :invite nickname channel))
 
 (defmethod invite ((connection connection) (user user) (channel channel))
   (invite connection (nickname user) (name channel)))
 
 (defmethod kick ((connection connection) (channel string)
                  (user string) &optional (comment ""))
-  (send-irc-message connection :kick comment channel user))
+  (send-irc-message connection :kick channel user comment))
 
 (defmethod kick ((connection connection) (channel channel)
                  (user user) &optional (comment ""))
   (kick connection (name channel) (nickname user) comment))
 
 (defmethod privmsg ((connection connection) (target string) (message string))
-  (send-irc-message connection :privmsg message target))
+  (send-irc-message connection :privmsg target message))
 
 (defmethod privmsg ((connection connection) (user user) (message string))
   (privmsg connection (nickname user) message))
@@ -211,7 +212,7 @@ registered."
   (privmsg connection (name channel) message))
 
 (defmethod notice ((connection connection) (target string) (message string))
-  (send-irc-message connection :notice message target))
+  (send-irc-message connection :notice target message))
 
 (defmethod notice ((connection connection) (user user) (message string))
   (notice connection (nickname user) message))
@@ -220,23 +221,23 @@ registered."
   (notice connection (name channel) message))
 
 (defmethod motd- ((connection connection) &optional (target ""))
-  (send-irc-message connection :motd nil target))
+  (send-irc-message connection :motd target))
 
 (defmethod lusers ((connection connection) &optional (mask "") (target ""))
-  (send-irc-message connection :lusers nil mask target))
+  (send-irc-message connection :lusers mask target))
 
 (defmethod version ((connection connection) &optional (target ""))
-  (send-irc-message connection :version nil target))
+  (send-irc-message connection :version target))
 
 (defmethod stats ((connection connection) &optional (query "") (target ""))
-  (send-irc-message connection :stats nil query target))
+  (send-irc-message connection :stats query target))
 
 (defmethod links ((connection connection) &optional (remote-server "")
                   (server-mask ""))
-  (send-irc-message connection :links nil remote-server server-mask))
+  (send-irc-message connection :links remote-server server-mask))
 
 (defmethod time- ((connection connection) &optional (target ""))
-  (send-irc-message connection :time nil target))
+  (send-irc-message connection :time target))
 
 (defun connect (&key (nickname *default-nickname*)
                      (username nil)
@@ -266,29 +267,29 @@ registered."
     connection))
 
 (defmethod trace- ((connection connection) &optional (target ""))
-  (send-irc-message connection :trace nil target))
+  (send-irc-message connection :trace target))
 
 (defmethod admin ((connection connection) &optional (target ""))
-  (send-irc-message connection :admin nil target))
+  (send-irc-message connection :admin target))
 
 (defmethod info ((connection connection) &optional (target ""))
-  (send-irc-message connection :info nil target))
+  (send-irc-message connection :info target))
 
 (defmethod servlist ((connection connection) &optional (mask "") (type ""))
-  (send-irc-message connection :servlist nil mask type))
+  (send-irc-message connection :servlist mask type))
 
 (defmethod squery ((connection connection) (service-name string) (text string))
   (send-irc-message connection :squery text service-name))
 
 (defmethod who ((connection connection) &optional (mask "") (o ""))
-  (send-irc-message connection :who nil mask o))
+  (send-irc-message connection :who mask o))
 
 (defmethod whois ((connection connection) (mask string) &optional (target ""))
-  (send-irc-message connection :whois nil target mask))
+  (send-irc-message connection :whois target mask))
 
 (defmethod whowas ((connection connection) (nickname string)
                    &optional (count "") (target ""))
-  (send-irc-message connection :whowas nil nickname count target))
+  (send-irc-message connection :whowas nickname count target))
 
 (defmethod kill ((connection connection) (nickname string) &optional (comment ""))
   (send-irc-message connection :kill comment nickname))
@@ -297,10 +298,10 @@ registered."
   (kill connection (nickname user) comment))
 
 (defmethod ping ((connection connection) (server string))
-  (send-irc-message connection :ping nil server))
+  (send-irc-message connection :ping server))
 
 (defmethod pong ((connection connection) (server string) &optional (server2 ""))
-  (send-irc-message connection :pong nil server server2))
+  (send-irc-message connection :pong server server2))
 
 (defmethod error- ((connection connection) (message string))
   (send-irc-message connection :error message))
@@ -319,29 +320,29 @@ registered."
 
 (defmethod summon ((connection connection) (nickname string)
                    &optional (target "") (channel ""))
-  (send-irc-message connection :summon nil nickname target channel))
+  (send-irc-message connection :summon nickname target channel))
 
 (defmethod users- ((connection connection) &optional (target ""))
-  (send-irc-message connection :users nil target))
+  (send-irc-message connection :users target))
 
 (defmethod wallops ((connection connection) (message string))
   (send-irc-message connection :wallops message))
 
 (defmethod userhost ((connection connection) (nickname string))
-  (send-irc-message connection :userhost nil nickname))
+  (send-irc-message connection :userhost nickname))
 
 (defmethod userhost ((connection connection) (user user))
   (userhost connection (nickname user)))
 
 (defmethod ison ((connection connection) (nickname string))
-  (send-irc-message connection :ison nil nickname))
+  (send-irc-message connection :ison nickname))
 
 (defmethod ison ((connection connection) (user user))
   (ison connection (nickname user)))
 
 ;; utility functions not part of the RFC
 (defmethod ctcp ((connection connection) target message)
-  (send-irc-message connection :privmsg (make-ctcp-message message) target))
+  (send-irc-message connection :privmsg target (make-ctcp-message message)))
 
 #|
 There's too much wrong with this method to fix it now.

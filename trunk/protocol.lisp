@@ -172,8 +172,7 @@ this stream.")
 (defgeneric read-message (connection))
 (defgeneric start-process (function name))
 (defgeneric read-irc-message (connection))
-(defgeneric send-irc-message (connection command
-                             &optional trailing-argument &rest arguments))
+(defgeneric send-irc-message (connection command &rest arguments))
 (defgeneric get-hooks (connection class))
 (defgeneric add-hook (connection class hook))
 (defgeneric remove-hook (connection class hook))
@@ -304,12 +303,10 @@ irc-message-event on them. Returns background process ID if available."
        ;; satisfy read-message-loop assumption of nil when no more messages
 
 (defmethod send-irc-message ((connection connection) command
-                             &optional trailing-argument &rest arguments)
+                             &rest arguments)
   "Turn the arguments into a valid IRC message and send it to the
 server, via the `connection'."
-  (let ((raw-message (make-irc-message command
-                                       :arguments arguments
-                                       :trailing-argument trailing-argument)))
+  (let ((raw-message (apply #'make-irc-message command arguments)))
     (write-sequence raw-message (network-stream connection))
     (force-output (network-stream connection))
     raw-message))

@@ -49,18 +49,14 @@ represents a time message as by the IRC protocol."
           second
           year))
 
-(defun make-irc-message (command &key (arguments nil)
-                                 (trailing-argument nil))
+(defun make-irc-message (command &rest arguments)
   "Return a valid IRC message, as a string, composed of the input
 parameters."
   (let ((*print-circle* nil))
-    (format nil "~A~{ ~A~}~A~A~A~A" command arguments
-	    (if trailing-argument
-		" :"
-              "")
-	    (or trailing-argument "")
-	    #\Return
-	    #\Linefeed)))
+    (format nil
+            "~A~{ ~A~}~@[ :~A~]~A~A"
+            command (butlast arguments) (car (last arguments))
+            #\Return #\Linefeed)))
 
 (defun make-ctcp-message (string)
   "Return a valid IRC CTCP message, as a string, composed by
