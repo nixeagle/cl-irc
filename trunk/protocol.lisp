@@ -817,10 +817,6 @@ may be already be on."
     :accessor arguments
     :initarg :arguments
     :type list)
-   (trailing-argument
-    :accessor trailing-argument
-    :initarg :trailing-argument
-    :type string)
    (connection
     :accessor connection
     :initarg :connection)
@@ -836,6 +832,13 @@ may be already be on."
   "Print the object for the Lisp reader."
   (print-unreadable-object (object stream :type t :identity t)
     (format stream "~A ~A" (source object) (command object))))
+
+;;Compat code; remove after 2006-08-01
+
+(defgeneric trailing-argument (message))
+(defmethod trailing-argument ((message irc-message))
+  (warn "Use of deprecated function irc:trailing-argument")
+  (car (last (arguments message))))
 
 (defgeneric self-message-p (message))
 (defgeneric find-irc-message-class (type))

@@ -10,6 +10,8 @@
 (defvar *msg3* (format nil "NOTICE AUTH :*** Your forward and reverse DNS don't match~A" #\Return))
 (defvar *msg4* (format nil ":kire_!~~eenge@adsl-156-35-240.asm.bellsouth.net MODE #lisppaste +k key~A" #\Return))
 (defvar *msg5* (format nil ":kire_!~~eenge@adsl-156-35-240.asm.bellsouth.net MODE #lisppaste +bbb *!*@somewhere.com *!*@somewhereles.com *!*@youdontwannaknow.org~A" #\Return))
+(defvar *msg6* (format nil ":kire!~~eenge@216.248.178.227 PRIVMSG cl-irc heyhey!~A" #\Return))
+
 
 (deftest find-reply-name.1 (irc:find-reply-name 1) :rpl_welcome)
 (deftest find-reply-name.2
@@ -59,4 +61,8 @@
 
 (deftest parse-raw-message.1
     (irc::parse-raw-message cl-irc-test::*msg1*)
-  "kire" "~eenge" "216.248.178.227" "PRIVMSG" ("cl-irc") "heyhey!")
+  "kire" "~eenge" "216.248.178.227" "PRIVMSG" ("cl-irc" "heyhey!"))
+
+(deftest no-trailing.1
+  (irc::parse-raw-message *msg6*)
+  "kire" "~eenge" "216.248.178.227" "PRIVMSG" ("cl-irc" "heyhey!"))

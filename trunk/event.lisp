@@ -85,26 +85,27 @@ objects in sync."))
       (re-apply-case-mapping connection))))
 
 (defmethod default-hook ((message irc-rpl_whoisuser-message))
-  (let ((user (find-user (connection message)
-                         (second (arguments message))))
-        (realname (trailing-argument message))
-        (username (third (arguments message)))
-        (hostname (fourth (arguments message))))
-    (when user
-      (setf (realname user) realname)
-      (setf (username user) username)
-      (setf (hostname user) hostname))))
+  (destructuring-bind
+      (target nick username hostname star realname)
+      (arguments message)
+    (declare (ignore target star))
+    (let ((user (find-user (connection message) nick)))
+      (when user
+        (setf (realname user) realname
+              (username user) username
+              (hostname user) hostname)))))
 
 (defmethod default-hook ((message irc-rpl_list-message))
-  (let ((connection (connection message))
-        (channel (second (arguments message)))
-        (user-count (parse-integer (or (third (arguments message)) "0")))
-        (topic (trailing-argument message)))
-    (add-channel connection (or (find-channel connection channel)
-                                (make-channel connection
-                                              :name channel
-                                              :topic topic
-                                              :user-count user-count)))))
+  (destructuring-bind
+      (channel count topic)
+      (arguments message)
+    (let ((connection (connection message))
+          (user-count (parse-integer count)))
+      (add-channel connection (or (find-channel connection channel)
+                                  (make-channel connection
+                                                :name channel
+                                                :topic topic
+                                                :user-count user-count))))))
 
 (defmethod default-hook ((message irc-rpl_topic-message))
   (setf (topic (find-channel (connection message)
@@ -112,31 +113,34 @@ objects in sync."))
         (trailing-argument message)))
 
 (defmethod default-hook ((message irc-rpl_namreply-message))
-  (let* ((connection (connection message))
-         (channel (find-channel connection (car (last (arguments message))))))
-    (unless (has-mode-p channel 'namreply-in-progress)
-      (add-mode channel 'namreply-in-progress
-                (make-instance 'list-value-mode :value-type :user)))
-    (dolist (nickname (tokenize-string (trailing-argument message)))
-      (let ((user (find-or-make-user connection
-                                     (canonicalize-nickname connection
-                                                            nickname))))
-        (unless (equal user (user connection))
-          (add-user connection user)
-          (add-user channel user)
-          (set-mode channel 'namreply-in-progress user))
-        (let* ((mode-char (getf (nick-prefixes connection)
-                                (elt nickname 0)))
-               (mode-name (when mode-char
-                            (mode-name-from-char connection
-                                                 channel mode-char))))
-          (when mode-name
-            (if (has-mode-p channel mode-name)
-                (set-mode channel mode-name user)
-              (set-mode-value (add-mode channel mode-name
-                                        (make-mode connection
-                                                   channel mode-name))
-                              user))))))))
+  (let* ((connection (connection message)))
+    (destructuring-bind
+        (nick chan-mode channel names)
+        (arguments message)
+      (let ((channel (find-channel connection channel)))
+        (unless (has-mode-p channel 'namreply-in-progress)
+          (add-mode channel 'namreply-in-progress
+                    (make-instance 'list-value-mode :value-type :user)))
+        (dolist (nickname (tokenize-string names))
+          (let ((user (find-or-make-user connection
+                                         (canonicalize-nickname connection
+                                                                nickname))))
+            (unless (equal user (user connection))
+              (add-user connection user)
+              (add-user channel user)
+              (set-mode channel 'namreply-in-progress user))
+            (let* ((mode-char (getf (nick-prefixes connection)
+                                    (elt nickname 0)))
+                   (mode-name (when mode-char
+                                (mode-name-from-char connection
+                                                     channel mode-char))))
+              (when mode-name
+                (if (has-mode-p channel mode-name)
+                    (set-mode channel mode-name user)
+                  (set-mode-value (add-mode channel mode-name
+                                            (make-mode connection
+                                                       channel mode-name))
+                                  user))))))))))
 
 (defmethod default-hook ((message irc-rpl_endofnames-message))
   (let* ((channel (find-channel (connection message)
@@ -152,7 +156,7 @@ objects in sync."))
       (remove-user channel user))))
 
 (defmethod default-hook ((message irc-ping-message))
-  (pong (connection message) (trailing-argument message)))
+  (apply #'pong (connection message) (arguments message)))
 
 (defmethod default-hook ((message irc-join-message))
   (let* ((connection (connection message))

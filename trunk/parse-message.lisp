@@ -60,6 +60,19 @@ trailing-argument part of the message.  Returns nil if the
 trailing-argument part is not present."
   (cut-between string #\: '(#\Return) :start start))
 
+(defun combine-arguments-and-trailing (string &key (start 0))
+  (multiple-value-bind
+      (start return-string)
+      (return-arguments string :start start)
+    (print return-string)
+    (multiple-value-bind
+        (return-index trailing)
+        (return-trailing-argument string :start start)
+      (print trailing)
+      (values return-index
+              (append return-string (when (and trailing (string/= "" trailing))
+                                      (list trailing)))))))
+
 (defun parse-raw-message (string &key (start 0))
   "Assuming `string' is a valid IRC message, parse the message and
 return the values in the following order:
@@ -78,8 +91,7 @@ Any values not present will be represented as nil."
                         return-user
                         return-host
                         return-command
-                        return-arguments
-                        return-trailing-argument))
+                        combine-arguments-and-trailing))
       (multiple-value-bind (return-index return-string)
           (funcall function string :start index)
         (setf index return-index)
@@ -145,10 +157,11 @@ know about."
   "If `string' is a valid IRC message parse it and return an object of
 the correct type with its slots prefilled according to the information
 in the message."
-  (multiple-value-bind (source user host command arguments trailing-argument)
+  (multiple-value-bind (source user host command arguments)
       (parse-raw-message string)
-    (let ((class 'irc-message)
-          (ctcp (ctcp-message-type trailing-argument)))
+    (let* ((class 'irc-message)
+           (trailing-argument (car (last arguments)))
+           (ctcp (ctcp-message-type trailing-argument)))
       (when command
         (cond
           (nil ;(irc-error-reply-p command)
@@ -177,7 +190,6 @@ in the message."
                                                   "")
                                      :arguments arguments
                                      :connection nil
-                                     :trailing-argument (or trailing-argument "")
                                      :received-time (get-universal-time)
                                      :raw-message-string (or string ""))))
         (when ctcp
