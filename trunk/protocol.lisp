@@ -261,7 +261,8 @@ input."
 (defun start-background-message-handler (connection)
   "Read messages from the `connection', parse them and dispatch
 irc-message-event on them. Returns background process ID if available."
-  (flet ((do-loop () (read-message-loop connection)))
+  (flet (#-(and sbcl (not sb-thread))
+           (do-loop () (read-message-loop connection)))
     (let ((name (format nil "irc-hander-~D" (incf *process-count*))))
       #+(or allegro cmu lispworks sb-thread openmcl armedbear)
       (start-process #'do-loop name)
@@ -426,7 +427,8 @@ user at this end can be reached via your normal connection object.")
 ;; generic functions.  need to resolve.
 (defmethod dcc-close ((connection dcc-connection))
   #+(and sbcl (not sb-thread))
-  (sb-sys:invalidate-descriptor (sb-sys:fd-stream-fd (stream connection)))
+  (sb-sys:invalidate-descriptor
+   (sb-sys:fd-stream-fd (network-stream connection)))
   (close (network-stream connection))
   (setf (user connection) nil)
   (setf *dcc-connections* (remove connection *dcc-connections*))
