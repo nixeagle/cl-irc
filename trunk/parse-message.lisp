@@ -64,11 +64,9 @@ trailing-argument part is not present."
   (multiple-value-bind
       (start return-string)
       (return-arguments string :start start)
-    (print return-string)
     (multiple-value-bind
         (return-index trailing)
         (return-trailing-argument string :start start)
-      (print trailing)
       (values return-index
               (append return-string (when (and trailing (string/= "" trailing))
                                       (list trailing)))))))

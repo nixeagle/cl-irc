@@ -232,8 +232,6 @@ objects in sync."))
   (destructuring-bind
       (target &rest arguments)
       (arguments message)
-    (print (arguments message))
-    (print arguments)
     (let* ((connection (connection message))
            (target (or (find-channel connection target)
                        (find-user connection target)))
