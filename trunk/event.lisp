@@ -26,7 +26,7 @@ objects in sync."))
   `(progn
      (defmethod default-hook ((message ,listmsg-class))
        (destructuring-bind
-           (target channel-name mask set-by time-set)
+           (target channel-name mask &optional set-by time-set)
            (arguments message)
          (declare (ignore target set-by time-set))
          ;; note: the structure currently does not allow for logging
