@@ -63,26 +63,38 @@ objects in sync."))
                          invitelist-in-progress :invite)
 
 (defmethod default-hook ((message irc-rpl_isupport-message))
-  (let* ((capabilities (cdr (arguments message)))
-         (connection (connection message))
-         (current-case-mapping (case-map-name connection)))
-    (setf (server-capabilities connection)
-          (let ((new-values (mapcar #'(lambda (x)
-                                        (let ((eq-pos (position #\= x)))
-                                          (if eq-pos
-                                              (list (subseq x 0 eq-pos)
-                                                    (subseq x (1+ eq-pos)))
-                                            (list x)))) capabilities)))
-            (merge 'list new-values (copy-seq *default-isupport-values*)
-                   #'string= :key #'first)))
-    (setf (channel-mode-descriptions connection)
-          (chanmode-descs-from-isupport (server-capabilities connection))
-          (nick-prefixes connection)
-          (nick-prefixes-from-isupport (server-capabilities connection)))
-    (when (not (equal current-case-mapping
-                      (case-map-name connection)))
-      ;; we need to re-normalize nicks and channel names
-      (re-apply-case-mapping connection))))
+  (destructuring-bind
+      (target &rest capabilities)
+      ;; the last argument contains only an explanitory text
+      (butlast (arguments message))
+    (declare (ignore target))
+    (let* ((connection (connection message))
+           (current-case-mapping (case-map-name connection)))
+      (setf (server-capabilities connection)
+            (reduce #'(lambda (x y)
+                        ;; O(n^2), but we're talking small lists anyway...
+                        ;; maybe I should have chosen a hash interface
+                        ;; after all...
+                        (if (assoc (first y) x :test #'string=)
+                            x
+                          (cons y x)))
+                    (append
+                     (mapcar #'(lambda (x)
+                                 (let ((eq-pos (position #\= x)))
+                                   (if eq-pos
+                                       (list (subseq x 0 eq-pos)
+                                             (subseq x (1+ eq-pos)))
+                                     (list x)))) capabilities)
+                     (server-capabilities connection))
+                    :initial-value '()))
+      (setf (channel-mode-descriptions connection)
+            (chanmode-descs-from-isupport (server-capabilities connection))
+            (nick-prefixes connection)
+            (nick-prefixes-from-isupport (server-capabilities connection)))
+      (when (not (equal current-case-mapping
+                        (case-map-name connection)))
+        ;; we need to re-normalize nicks and channel names
+        (re-apply-case-mapping connection)))))
 
 (defmethod default-hook ((message irc-rpl_whoisuser-message))
   (destructuring-bind
