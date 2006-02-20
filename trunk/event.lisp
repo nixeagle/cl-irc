@@ -332,7 +332,7 @@ objects in sync."))
    (connection message)
    :notice (source message)
    (make-ctcp-message
-    (format nil "PING ~A" (trailing-argument message)))))
+    (format nil "PING ~A" (car (last (arguments message)))))
 
 (defmethod irc-message-event (connection (message ctcp-dcc-chat-request-message))
   (declare (ignore connection))

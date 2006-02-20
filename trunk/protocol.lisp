@@ -889,8 +889,8 @@ may be already be on."
             (received-time message)
             (command message)
             (source message)
-            (arguments message)
-            (trailing-argument message))
+            (butlast (arguments message))
+            (car (last (arguments message))))
     (force-output stream)))
 
 (defmethod apply-to-hooks ((message irc-message))
@@ -940,7 +940,7 @@ may be already be on."
             (command message)
             (ctcp-command message)
             (source message)
-            (arguments message)
-            (trailing-argument message))
+            (butlast (arguments message))
+            (car (last (arguments message))))
     (force-output stream)))
 
