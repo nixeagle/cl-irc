@@ -15,6 +15,7 @@
              :irc-message-event
              :start-background-message-handler
              :stop-background-message-handler
+             :destructuring-arguments
              :socket-connect
              :server-name
              :no-such-reply
