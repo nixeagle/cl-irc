@@ -158,6 +158,75 @@ returned."
                     (subseq string cut-from end-position))
           (values start nil))))))
 
+
+;;
+;; Message arguments binding macro
+;;
+
+
+(defmacro destructuring-arguments (lambda-list message &body body)
+  "Destructures the arguments slot in MESSAGE according
+to LAMBDA-LIST and binds them in BODY.
+destructuring-irc-message-arguments's lambda list syntax is as follows:
+
+reqvars::= var*
+optvars::= [&optional {var | (var [init-form [supplied-p-parameter]])}*]
+restvar::= [&rest var]
+wholevar::= [&whole var]
+lastvar::= [&last var]
+lambda-list::= (wholevar reqvars optvars restvar lastvar)
+
+With the exception of &last, all lambda list keywords are
+analogous to a destructuring lambda list's (see clhs 3.4.5).
+
+If &last is given, the specified variable is bound to the last
+argument in the message. Specifying &last implies that all
+arguments past the last of the required variables will be
+ignored, even if there is no &rest lambda list keyword present.
+
+If both &rest and &last are specified, the last element in the
+list is also included in the rest list."
+  (let ((valid-bare-ll-keywords '(&optional &rest &whole))
+        (nothing (gensym))
+        (%message (gensym)))
+    (labels ((keyword-ll-entry-p (entry)
+               (eql (schar (symbol-name entry) 0) #\&))
+             (valid-bare-ll-entry-p (entry)
+               (or (not (keyword-ll-entry-p entry))
+                   (member entry valid-bare-ll-keywords :test 'string=)))
+             (append-&rest-p (last-entries destructuring-ll)
+              (not (or (null last-entries)
+                       (member '&rest destructuring-ll :test 'string=)))))
+      (let* ((last-entries (member '&last lambda-list :test 'string=))
+             (last-variable (second last-entries))
+             (destructuring-ll (butlast lambda-list (length last-entries)))
+             (invalid-ll-entries (remove-if #'valid-bare-ll-entry-p
+                                            destructuring-ll)))
+        (unless (or (null last-entries) (= 2 (length last-entries)))
+          (error "Invalid number of &last arguments in ~S" lambda-list))
+        (when (and last-variable (member last-variable destructuring-ll))
+          (error "Duplicate entry ~S in lambda list ~S"
+                 last-variable lambda-list))
+        (when invalid-ll-entries
+          (error "Invalid lambda list entries ~S found in ~S"
+                 invalid-ll-entries lambda-list))
+        `(let ((,%message ,message))
+           (let (,@(when last-entries
+                     `((,last-variable (car (last (arguments ,%message)))))))
+             (destructuring-bind ,(if (append-&rest-p last-entries
+                                                      destructuring-ll)
+                                      (append destructuring-ll
+                                              `(&rest ,nothing))
+                                      destructuring-ll)
+                 (arguments ,%message)
+               ,@(when (append-&rest-p last-entries destructuring-ll)
+                   `((declare (ignore ,nothing))))
+               ,@body)))))))
+
+;;
+;; RPL_ISUPPORT support routines
+;;
+
 (defun parse-isupport-prefix-argument (prefix)
   (declare (type string prefix))
   (let ((closing-paren-pos (position #\) prefix)))
