@@ -289,52 +289,52 @@ objects in sync."))
               (remove-channel user channel)
             (remove-user channel user)))))))
 
-(defmethod default-hook ((message ctcp-time-message))
-  (multiple-value-bind
-      (second minute hour date month year day)
-      (get-decoded-time)
-    (send-irc-message
-     (connection message)
-     :notice (source message)
-     (make-ctcp-message
-      (format nil "TIME ~A"
-              (make-time-message second minute hour date month year day))))))
-
-(defmethod default-hook ((message ctcp-source-message))
-  (send-irc-message
-   (connection message)
-   :notice
-   (source message)
-   (make-ctcp-message
-    (format nil "SOURCE ~A:~A:~A"
-            *download-host*
-            *download-directory*
-            *download-file*))))
-
-(defmethod default-hook ((message ctcp-finger-message))
-  (let* ((user (user (connection message)))
-         (finger-info (if (not (zerop (length (realname user))))
-                          (realname user)
-                          (nickname user))))
-    (send-irc-message
-     (connection message)
-     :notice (source message)
-     (make-ctcp-message
-      (format nil "FINGER ~A" finger-info)))))
-
-(defmethod default-hook ((message ctcp-version-message))
-  (send-irc-message
-   (connection message)
-   :notice (source message)
-   (make-ctcp-message
-    (format nil "VERSION ~A" *ctcp-version*))))
-
-(defmethod default-hook ((message ctcp-ping-message))
-  (send-irc-message
-   (connection message)
-   :notice (source message)
-   (make-ctcp-message
-    (format nil "PING ~A" (car (last (arguments message)))))))
+(macrolet ((define-ctcp-reply-hook ((message-var message-type) &body body)
+               `(defmethod default-hook ((,message-var ,message-type))
+                  (when (ctcp-request-p ,message-var)
+                    ,@body))))
+  (define-ctcp-reply-hook (message ctcp-time-message)
+      (multiple-value-bind
+          (second minute hour date month year day)
+          (get-decoded-time)
+        (send-irc-message
+         (connection message)
+         :notice (source message)
+         (make-ctcp-message
+          (format nil "TIME ~A"
+                  (make-time-message second minute hour date month year day))))))
+  (define-ctcp-reply-hook (message ctcp-source-message)
+      (send-irc-message
+       (connection message)
+       :notice
+       (source message)
+       (make-ctcp-message
+        (format nil "SOURCE ~A:~A:~A"
+                *download-host*
+                *download-directory*
+                *download-file*))))
+  (define-ctcp-reply-hook (message ctcp-finger-message)
+      (let* ((user (user (connection message)))
+             (finger-info (if (not (zerop (length (realname user))))
+                              (realname user)
+                              (nickname user))))
+        (send-irc-message
+         (connection message)
+         :notice (source message)
+         (make-ctcp-message
+          (format nil "FINGER ~A" finger-info)))))
+  (define-ctcp-reply-hook (message ctcp-version-message)
+      (send-irc-message
+       (connection message)
+       :notice (source message)
+       (make-ctcp-message
+        (format nil "VERSION ~A" *ctcp-version*))))
+  (define-ctcp-reply-hook (message ctcp-ping-message)
+      (send-irc-message
+       (connection message)
+       :notice (source message)
+       (make-ctcp-message
+        (format nil "PING ~A" (car (last (arguments message))))))))
 
 (defmethod irc-message-event (connection (message ctcp-dcc-chat-request-message))
   (declare (ignore connection))

@@ -932,6 +932,12 @@ may be already be on."
   (declare (ignore type))
   (find-class 'standard-ctcp-message))
 
+(defmethod ctcp-request-p ((message ctcp-mixin))
+  (string= (command message) :privmsg))
+
+(defmethod ctcp-reply-p ((message ctcp-mixin))
+  (string= (command message) :notice))
+
 (defmethod client-log ((connection connection) (message ctcp-mixin) &optional (prefix ""))
   (let ((stream (client-stream connection)))
     (format stream "~A~A: ~A (~A): ~A~{ ~A~} \"~A\"~%"
