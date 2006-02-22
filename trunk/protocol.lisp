@@ -781,17 +781,17 @@ may be already be on."
     user))
 
 (defmethod change-nickname ((connection connection) (user user) new-nickname)
-  (let ((new-user user)
-        (channels (channels user)))
+  (let ((channels (channels user)))
     (remove-user connection user)
-    (setf (nickname new-user) new-nickname)
-    (setf (normalized-nickname new-user)
+    (dolist (channel channels)
+      (remove-user channel user))
+    (setf (nickname user) new-nickname)
+    (setf (normalized-nickname user)
           (normalize-nickname connection new-nickname))
     (dolist (channel channels)
-      (remove-user channel user)
-      (add-user channel new-user))
+      (add-user channel user))
     (add-user connection user)
-    new-user))
+    user))
 
 ;; IRC Message
 ;;
