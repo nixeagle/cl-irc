@@ -121,7 +121,7 @@ objects in sync."))
 
 (defmethod default-hook ((message irc-rpl_topic-message))
   (destructuring-bind
-      (target channel topic)
+      (target channel &optional topic)
       (arguments message)
     (declare (ignore target))
     (setf (topic (find-channel (connection message) channel)) topic)))
