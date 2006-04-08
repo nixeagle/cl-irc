@@ -1,0 +1,115 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head>
+    <link rel="stylesheet" href="style.css" type="text/css">
+      <title>cl-irc</title></head> 
+
+
+  <body>
+    <div class="header">
+      <h1>cl-irc 0.7.0</h1>
+    </div>
+    <div class="body">
+    
+      <p>cl-irc is a Common Lisp IRC client library that
+      features (partial) DCC, CTCP and all relevant commands from the
+      IRC RFCs (<a
+      href="http://www.faqs.org/rfcs/rfc2810.html">RFC2810</a>, <a
+      href="http://www.faqs.org/rfcs/rfc2811.html">RFC2811</a> and <a
+      href="http://www.faqs.org/rfcs/rfc2812.html">RFC2812</a>).  It
+      uses ASDF and has been tested mostly on SBCL but should work for
+      other implementations with little or no extra code.</p>
+
+      <p>The code is released under an <a
+      href="http://common-lisp.net/cgi-bin/viewcvs.cgi/cl-irc/LICENSE?rev=HEAD&cvsroot=cl-irc&content-type=text/vnd.viewcvs-markup">MIT-style
+      license</a>.  I need to mention that Jochen Schmidt laid the
+      groundwork for this library with his <a
+      href="http://www.sf.net/projects/weird-irc">Weird-IRC</a> IRC
+      client and that therefore some of the code is copyright him.</p>
+
+      <h2>News</h2>
+      <div class="level">
+        <li>Version 0.7.0 released (RPL_ISUPPORT, many small tweaks and fixes)</li>
+        <li>Version 0.6.0 released (interim release while common-lisp.net was down)</li>
+        <li>Version 0.5.0 released (package rename and minor changes)</li>
+        <li>Version 0.4.0 released (some documentation, beginnings of a test suite, better performance)</li>
+      </div>
+
+      <h2>Features</h2>
+      <div class="level">
+	<ul>
+	  <li>implements all commands in the RFCs</li>
+     <li>extra convenience commands such as op/deop, ban, ignore, etc.</li>
+     <li>partial DCC SEND/CHAT support</li>
+     <li>event driven model with hooks makes interfacing easy</li>
+     <li>the user can keep multiple connections</li>
+     <li>all CTCP commands</li>
+	</ul>
+      </div>
+
+      <h2>Installation</h2>
+      <div class="level">
+	<p>If you have <a href="http://www.cliki.net/asdf-install">
+	    asdf-install</a>, just:
+	</p>
+	<pre>$ asdf-install cl-irc</pre> 
+	
+	<p>cl-irc can manually be downloaded from here:
+	  <tt><a href="ftp://common-lisp.net/pub/project/cl-irc/cl-irc_latest.tar.gz">
+	      cl-irc_latest.tar.gz</a>
+	  </tt>.</p>
+	
+	<p>There is also <a href="http://common-lisp.net/faq.shtml#checkout">anonymous CVS
+	  </a> and <a href="http://common-lisp.net/cgi-bin/viewcvs.cgi/?cvsroot=cl-irc">
+	    ViewCVS
+	  </a>.
+	</p>
+      </div>
+
+      <h2>Contact</h2>
+      <div class="level">
+	<p>Questions, feature requests, and bug-reports are welcome on
+	  <tt><a href="mailto:cl-irc-devel@common-lisp.net">
+	      cl-irc-devel@common-lisp.net</a></tt>.</p>
+      </div>
+
+      <h2>Sample usage</h2>
+      <div class="level">
+	<pre>
+  * (require :cl-irc)
+
+  * (in-package :irc)
+
+  * (defvar connection (connect :nickname "mynick"
+                                :server "irc.somewhere.org"))
+
+  * (read-message-loop connection)
+
+;; That's it.  Interrupt the read-message-loop and do:
+
+  * (join connection "#lisp")
+
+;; etc. (look at command.lisp) to operate the library.  After issuing
+;; a command, you need to get back on the feed:
+
+  * (read-message-loop connection)
+
+;; If you need to do something on every join, do:
+
+  * (defun my-hook (message)
+     &lt;do-something&gt;)
+
+  * (add-hook connection 'irc-join-message #'my-hook)
+
+;; and it will be run next time the library receives an
+;; irc-join-message.  For a full list of messages you can hook into,
+;; look at event.lisp.
+
+;; Your connection object will get updated by the library with regards
+;; to users joining/parting channels, you joining/parting channels,
+;; etc.  Look at protocol.lisp's connection object for slots and
+;; methods.
+   </pre>
+      </div>      
+
+
+    </div>
+  </body></html>
