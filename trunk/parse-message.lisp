@@ -112,8 +112,8 @@ reply, nil otherwise."
 
 (defun ctcp-type-p (string type)
   "Is the `string' actually a representation of the CTCP `type'?"
-  (if (string-equal (subseq string 1 (min (length string) 
-                                          (1+ (length (symbol-name type))))) 
+  (if (string-equal (substring string 1 (min (length string)
+                                             (1+ (length (symbol-name type)))))
                     type)
       type
       nil))

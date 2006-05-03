@@ -106,6 +106,14 @@ parse-integer) on each of the string elements."
   "Create a socket connected to `server':`port' and return stream for it."
   (trivial-sockets:open-stream server port))
 
+(defun substring (string start &optional end)
+  (let* ((end-index (if end end (length string)))
+         (seq-len (- end-index start)))
+    (make-array seq-len
+                :element-type (array-element-type string)
+                :displaced-to string
+                :displaced-index-offset start)))
+
 
 (defun cut-between (string start-char end-chars &key (start 0) (cut-extra t))
   "If `start-char' is not nil, cut string between `start-char' and any
@@ -127,11 +135,11 @@ returned."
     (if (and end-position start-char)
         (if (eql (char string start) start-char)
             (values end-position
-                    (subseq string cut-from end-position))
+                    (substring string cut-from end-position))
             (values start nil))
         (if end-position
             (values end-position
-                    (subseq string cut-from end-position))
+                    (substring string cut-from end-position))
             (values start nil)))))
 
 (defun cut-before (string substring end-chars &key (start 0) (cut-extra t))
@@ -146,7 +154,7 @@ returned."
   (let ((end-position (search substring string :start2 start)))
     (if end-position
         (values (+ end-position (1- (length substring)))
-                (subseq string (if (and cut-extra
+                (substring string (if (and cut-extra
                                         (< start end-position))
                                    (1+ start) start) end-position))
       (let ((end-position (position-if #'(lambda (x)
@@ -155,7 +163,7 @@ returned."
             (cut-from (if cut-extra (1+ start) start)))
         (if end-position
             (values end-position
-                    (subseq string cut-from end-position))
+                    (substring string cut-from end-position))
           (values start nil))))))
 
 
