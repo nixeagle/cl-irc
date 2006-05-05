@@ -687,7 +687,7 @@ be found, return nil."
              (second (assoc "PREFIX"
                             (server-capabilities connection)
                             :test #'string=))))
-      (subseq nickname 1)
+      (substring nickname 1)
       nickname))
 
 (defun normalize-nickname (connection string)

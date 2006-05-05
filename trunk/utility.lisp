@@ -115,10 +115,11 @@ parse-integer) on each of the string elements."
                 :displaced-index-offset start)))
 
 
-(defun cut-between (string start-char end-chars &key (start 0) (cut-extra t))
+(defun cut-between (string start-char end-chars
+                           &key (start 0) (cut-extra t) (cut-to-end nil))
   "If `start-char' is not nil, cut string between `start-char' and any
 of the `end-chars', from `start'.  If `start-char' is nil, cut from
-`start' until any of the `end-chars'.
+`start' until any of the `end-chars' (or sting-end when `cut-to-end' is true).
 
 If `cut-extra' is t, we will cut from start + 1 instead of just
 `start'.
@@ -126,9 +127,10 @@ If `cut-extra' is t, we will cut from start + 1 instead of just
 When there is no string matching the input parameters `start' and nil
 will be returned, otherwise `end-position' and the string are
 returned."
-  (let ((end-position (position-if #'(lambda (char)
-                                       (member char end-chars))
-                                   string :start (1+ start)))
+  (let ((end-position (or (position-if #'(lambda (char)
+                                           (member char end-chars))
+                                       string :start (1+ start))
+                          (when cut-to-end (length string))))
         (cut-from (if cut-extra
                       (1+ start)
                       start)))
@@ -142,8 +144,11 @@ returned."
                     (substring string cut-from end-position))
             (values start nil)))))
 
-(defun cut-before (string substring end-chars &key (start 0) (cut-extra t))
-  "Cut `string' before `substring' or any of the `end-chars', from `start'.
+(defun cut-before (string substring end-chars
+                          &key (start 0) (cut-extra t) (cut-to-end nil))
+  "Cut `string' before `substring' or any of the `end-chars', from `start',
+if none of substring or end-chars are found, until the end of the string
+when `cut-to-end' is true.
 
 If `cut-extra' is t, we will cut from start + 1 instead of just
 `start'.
@@ -157,9 +162,10 @@ returned."
                 (substring string (if (and cut-extra
                                         (< start end-position))
                                    (1+ start) start) end-position))
-      (let ((end-position (position-if #'(lambda (x)
-                                           (member x end-chars))
-                                       string :start (1+ start)))
+      (let ((end-position (or (position-if #'(lambda (x)
+                                               (member x end-chars))
+                                           string :start (1+ start))
+                              (when cut-to-end (length string))))
             (cut-from (if cut-extra (1+ start) start)))
         (if end-position
             (values end-position
@@ -240,8 +246,8 @@ list is also included in the rest list."
   (let ((closing-paren-pos (position #\) prefix)))
     (when (and (eq (elt prefix 0) #\( )
                closing-paren-pos)
-      (let ((prefixes (subseq prefix (1+ closing-paren-pos)))
-            (modes (subseq prefix 1 closing-paren-pos)))
+      (let ((prefixes (substring prefix (1+ closing-paren-pos)))
+            (modes (substring prefix 1 closing-paren-pos)))
         (when (= (length prefixes)
                  (length modes))
           (values prefixes modes))))))
@@ -355,7 +361,7 @@ It returns a list of mode-description records."
         (do ((changes (pop arguments) (pop arguments)))
             ((null changes) (values ops nil))
           (let* ((this-op (char changes 0))
-                 (modes (subseq changes 1))
+                 (modes (substring changes 1))
                  (param-req (if (char= this-op #\+)
                                 #'mode-desc-param-on-set-p
                               #'mode-desc-param-on-unset-p)))

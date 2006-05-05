@@ -58,7 +58,7 @@ part is not present."
   "Assuming `string' is a valid IRC message this function returns the
 trailing-argument part of the message.  Returns nil if the
 trailing-argument part is not present."
-  (cut-between string #\: '(#\Return) :start start))
+  (cut-between string #\: '(#\Return) :start start :cut-to-end t))
 
 (defun combine-arguments-and-trailing (string &key (start 0))
   (multiple-value-bind
