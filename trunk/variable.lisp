@@ -41,6 +41,25 @@
     ("PREFIX" ,*default-isupport-PREFIX*)
     ("TARGMAX")))
 
+(defparameter *default-outgoing-external-format* '(:utf-8)
+  "The external-format we use to encode outgoing messages. This
+  should be an external format spec that flexi-streams accepts.
+
+  :eol-style will always be overridden to be :crlf as required
+  by the IRC protocol.")
+
+(defparameter *default-incoming-external-formats* '((:utf-8 :eol-style :crlf)
+                                                    (:latin1 :eol-style :crlf))
+  "The external-formats we use to decode incoming messages. This should
+  be a list of external format specs that flexi-streams accepts.
+
+  The external formats are tried in order, until one decodes the
+  message without encoding errors. Note that the last external
+  format should be a single-byte one with most or even all valid
+  codepoints (such as latin-1).
+
+  :eol-style will always be overridden to be :crlf as required by the
+  IRC protocol.")
 
 (defvar *dcc-connections* nil)
 

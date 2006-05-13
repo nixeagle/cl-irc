@@ -54,9 +54,8 @@ represents a time message as by the IRC protocol."
 parameters."
   (let ((*print-circle* nil))
     (format nil
-            "~A~{ ~A~}~@[ :~A~]~A~A"
-            command (butlast arguments) (car (last arguments))
-            #\Return #\Linefeed)))
+            "~A~{ ~A~}~@[ :~A~]~%"
+            command (butlast arguments) (car (last arguments)))))
 
 (defun make-ctcp-message (string)
   "Return a valid IRC CTCP message, as a string, composed by
@@ -104,7 +103,45 @@ parse-integer) on each of the string elements."
 
 (defun socket-connect (server port)
   "Create a socket connected to `server':`port' and return stream for it."
-  (trivial-sockets:open-stream server port))
+  (trivial-sockets:open-stream server port :element-type '(unsigned-byte 8)))
+
+(defun external-format-fixup (format)
+  (let ((new-format (copy-list format)))
+    (setf (getf (cdr new-format) :eol-style) :crlf)
+    new-format))
+
+(defun read-byte-no-hang (stream &optional eof-error-p eof-value)
+  (declare (optimize (speed 3) (debug 0) (safety 0)))
+  (when (listen stream)
+    (read-byte stream eof-error-p eof-value)))
+
+(defun read-sequence-until (stream target limit &key non-blocking)
+  "Reads data from `stream' into `target' until the subsequence
+`limit' is reached or `target' is not large enough to hold the data."
+  (let ((read-fun (if (subtypep (stream-element-type stream) 'integer)
+                      (if non-blocking #'read-byte-no-hang #'read-byte)
+                    (if non-blocking #'read-char-no-hang #'read-char)))
+        (limit-pos 0)
+        (targ-max (1- (length target)))
+        (limit-max (length limit))
+        (limit-cur 0)
+        (targ-cur -1))
+    (declare (optimize (speed 3) (debug 0)))
+    ;; In SBCL read-char is a buffered operations (depending on
+    ;; stream creation parameters), so this loop should be quite efficient
+    ;; For others, if this becomes an efficiency problem, please report...
+    (loop for next-elt = (funcall read-fun stream nil nil)
+          if (null next-elt)
+          do (return (values target targ-cur t))
+          else do
+          (setf (elt target (incf targ-cur)) next-elt)
+          (if (eql next-elt (elt limit limit-cur))
+              (incf limit-cur)
+            (setf limit-cur 0))
+
+          if (or (= targ-cur targ-max)
+                 (= limit-cur limit-max))
+          do (return (values target (1+ targ-cur) nil)))))
 
 (defun substring (string start &optional end)
   (let* ((end-index (if end end (length string)))

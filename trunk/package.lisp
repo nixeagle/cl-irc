@@ -41,6 +41,7 @@
              :user-count
              :users
              :network-stream
+             :output-stream
              :client-stream
              :channels
              :add-hook

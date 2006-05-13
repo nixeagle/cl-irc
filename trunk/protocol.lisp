@@ -117,7 +117,11 @@ user class.")))
    (network-stream
     :initarg :network-stream
     :accessor network-stream
-    :documentation "Stream used to talk to the IRC server.")
+    :documentation "Stream used to talk binary to the IRC server.")
+   (output-stream
+    :initarg :output-stream
+    :accessor output-stream
+    :documentation "Stream used to send messages to the IRC server")
    (server-capabilities
     :initform *default-isupport-values*
     :accessor server-capabilities
@@ -186,12 +190,18 @@ this stream.")
                              (user nil)
                              (server-name "")
                              (network-stream nil)
+                             (outgoing-external-format *default-outgoing-external-format*)
                              (client-stream t)
                              (hooks nil))
-  (let ((connection (make-instance connection-type
+  (let* ((output-stream (flexi-streams:make-flexi-stream
+                         network-stream
+                         :element-type 'character
+                         :external-format (external-format-fixup outgoing-external-format)))
+         (connection (make-instance connection-type
                                    :user user
                                    :server-name server-name
                                    :network-stream network-stream
+                                   :output-stream output-stream
                                    :client-stream client-stream)))
     (dolist (hook hooks)
       (add-hook connection (car hook) (cadr hook)))
@@ -292,13 +302,40 @@ irc-message-event on them. Returns background process ID if available."
 (defun read-message-loop (connection)
   (loop while (read-message connection)))
 
+(defun try-decode-line (line external-formats)
+  (loop for external-format in external-formats
+        for decoded = nil
+        for error = nil
+        do (multiple-value-setq (decoded error)
+             (handler-case
+              (flexi-streams:with-input-from-sequence (in line)
+                (let ((flexi (flexi-streams:make-flexi-stream in
+;;                                                              :element-type 'character
+                                                              :external-format
+                                                              (external-format-fixup external-format))))
+                  (read-line flexi nil nil)))
+              (flexi-streams:flexi-stream-encoding-error ()
+                  nil)))
+        if decoded
+        do (return decoded)))
+
 (defmethod read-irc-message ((connection connection))
   "Read and parse an IRC-message from the `connection'."
   (handler-case
-    (let ((message (create-irc-message
-                    (read-line (network-stream connection) t))))
-      (setf (connection message) connection)
-      message)
+   (multiple-value-bind
+       (buf buf-len)
+       ;; Note: we cannot use read-line here (or any other
+       ;; character based functions), since they may cause conversion
+       (read-sequence-until (network-stream connection)
+                            (make-array 1024
+                                        :element-type '(unsigned-byte 8)
+                                        :fill-pointer t)
+                            '(13 10))
+     (setf (fill-pointer buf) buf-len)
+     (print buf)
+     (let* ((message (create-irc-message (try-decode-line buf *default-incoming-external-formats*))))
+       (setf (connection message) connection)
+       message))
     (end-of-file ())))
        ;; satisfy read-message-loop assumption of nil when no more messages
 
@@ -307,8 +344,8 @@ irc-message-event on them. Returns background process ID if available."
   "Turn the arguments into a valid IRC message and send it to the
 server, via the `connection'."
   (let ((raw-message (apply #'make-irc-message command arguments)))
-    (write-sequence raw-message (network-stream connection))
-    (force-output (network-stream connection))
+    (write-sequence raw-message (output-stream connection))
+    (force-output (output-stream connection))
     raw-message))
 
 (defmethod get-hooks ((connection connection) (class symbol))
