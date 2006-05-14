@@ -135,8 +135,8 @@ objects in sync."))
       (let ((channel (find-channel connection channel)))
         (setf (visibility channel)
               (or (car (assoc chan-visibility
-                              '((#\= :public) (#\* :private) (#\@ :secret))
-                              :test #'char=))
+                              '(("=" :public) ("*" :private) ("@" :secret))
+                              :test #'string=))
                   :unknown))
         (unless (has-mode-p channel 'namreply-in-progress)
           (add-mode channel 'namreply-in-progress

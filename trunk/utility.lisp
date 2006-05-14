@@ -121,7 +121,7 @@ parse-integer) on each of the string elements."
   (let ((read-fun (if (subtypep (stream-element-type stream) 'integer)
                       (if non-blocking #'read-byte-no-hang #'read-byte)
                     (if non-blocking #'read-char-no-hang #'read-char)))
-        (limit-vector (coerce limit '(vector * t)))
+        (limit-vector (coerce limit '(vector t *)))
         (targ-max (1- (length target)))
         (limit-max (length limit))
         (limit-cur 0)

@@ -335,7 +335,6 @@ irc-message-event on them. Returns background process ID if available."
                                         :fill-pointer t)
                             '(13 10))
      (setf (fill-pointer buf) buf-len)
-     (print buf)
      (let* ((message (create-irc-message (try-decode-line buf *default-incoming-external-formats*))))
        (setf (connection message) connection)
        message))
