@@ -38,6 +38,7 @@
              :normalized-name
              :topic
              :modes
+             :visibility
              :user-count
              :users
              :network-stream

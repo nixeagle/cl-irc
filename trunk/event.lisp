@@ -132,11 +132,12 @@ objects in sync."))
         (nick chan-visibility channel names)
         (arguments message)
       (declare (ignore nick chan-visibility))
-      ;; chan-visibility is (member '= '@ '*)
-      ;; '= == public
-      ;; '@ == secret
-      ;; '* == private
       (let ((channel (find-channel connection channel)))
+        (setf (visibility channel)
+              (or (car (assoc chan-visibility
+                              '((#\= :public) (#\* :private) (#\@ :secret))
+                              :test #'char=))
+                  :unknown))
         (unless (has-mode-p channel 'namreply-in-progress)
           (add-mode channel 'namreply-in-progress
                     (make-instance 'list-value-mode :value-type :user)))
