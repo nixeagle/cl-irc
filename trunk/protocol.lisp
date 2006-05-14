@@ -260,6 +260,7 @@ input."
 (defvar *process-count* 0)
 
 (defmethod start-process (function name)
+  (declare (ignorable name))
   #+allegro (mp:process-run-function name function)
   #+cmu (mp:make-process function :name name)
   #+lispworks (mp:process-run-function name nil function)
@@ -273,6 +274,7 @@ irc-message-event on them. Returns background process ID if available."
   (flet (#-(and sbcl (not sb-thread))
            (do-loop () (read-message-loop connection)))
     (let ((name (format nil "irc-hander-~D" (incf *process-count*))))
+      (declare (ignorable name))
       #+(or allegro cmu lispworks sb-thread openmcl armedbear)
       (start-process #'do-loop name)
       #+(and sbcl (not sb-thread))
@@ -292,6 +294,7 @@ irc-message-event on them. Returns background process ID if available."
 
 (defun stop-background-message-handler (process)
   "Stops a background message handler process returned by the start function."
+  (declare (ignorable process))
     #+cmu (mp:destroy-process process)
     #+allegro (mp:process-kill process)
     #+sb-thread (sb-thread:destroy-thread process)

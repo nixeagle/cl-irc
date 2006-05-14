@@ -129,8 +129,13 @@ objects in sync."))
 (defmethod default-hook ((message irc-rpl_namreply-message))
   (let* ((connection (connection message)))
     (destructuring-bind
-        (nick chan-mode channel names)
+        (nick chan-visibility channel names)
         (arguments message)
+      (declare (ignore nick chan-visibility))
+      ;; chan-visibility is (member '= '@ '*)
+      ;; '= == public
+      ;; '@ == secret
+      ;; '* == private
       (let ((channel (find-channel connection channel)))
         (unless (has-mode-p channel 'namreply-in-progress)
           (add-mode channel 'namreply-in-progress
@@ -205,6 +210,7 @@ objects in sync."))
     (destructuring-bind
         (channel &optional text)
         arguments
+      (declare (ignore text))
       (let ((channel (find-channel connection channel))
             (user (find-user connection source)))
         (when (and user channel)
@@ -225,11 +231,10 @@ objects in sync."))
     (destructuring-bind
         (target channel &rest mode-arguments)
         arguments
-    (declare (ignore target))
     (let* ((channel (find-channel connection channel))
            (mode-changes
             (when channel
-              (parse-mode-arguments connection channel arguments
+              (parse-mode-arguments connection channel mode-arguments
                                     :server-p (user connection)))))
       (dolist (change mode-changes)
         (destructuring-bind
@@ -281,7 +286,7 @@ objects in sync."))
     (destructuring-bind
         (channel nick &optional reason)
         arguments
-      (declare (ignore arguments))
+      (declare (ignore reason))
       (let* ((channel (find-channel connection channel))
              (user (find-user connection nick)))
         (when (and user channel)

@@ -121,12 +121,13 @@ parse-integer) on each of the string elements."
   (let ((read-fun (if (subtypep (stream-element-type stream) 'integer)
                       (if non-blocking #'read-byte-no-hang #'read-byte)
                     (if non-blocking #'read-char-no-hang #'read-char)))
-        (limit-pos 0)
+        (limit-vector (coerce limit '(vector * t)))
         (targ-max (1- (length target)))
         (limit-max (length limit))
         (limit-cur 0)
         (targ-cur -1))
-    (declare (optimize (speed 3) (debug 0)))
+    (declare (optimize (speed 3) (debug 0))
+             (type fixnum targ-cur))
     ;; In SBCL read-char is a buffered operations (depending on
     ;; stream creation parameters), so this loop should be quite efficient
     ;; For others, if this becomes an efficiency problem, please report...
@@ -135,7 +136,7 @@ parse-integer) on each of the string elements."
           do (return (values target targ-cur t))
           else do
           (setf (elt target (incf targ-cur)) next-elt)
-          (if (eql next-elt (elt limit limit-cur))
+          (if (eql next-elt (aref limit-vector limit-cur))
               (incf limit-cur)
             (setf limit-cur 0))
 
