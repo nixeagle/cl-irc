@@ -11,6 +11,7 @@
 (defvar *msg4* (format nil ":kire_!~~eenge@adsl-156-35-240.asm.bellsouth.net MODE #lisppaste +k key~A" #\Return))
 (defvar *msg5* (format nil ":kire_!~~eenge@adsl-156-35-240.asm.bellsouth.net MODE #lisppaste +bbb *!*@somewhere.com *!*@somewhereles.com *!*@youdontwannaknow.org~A" #\Return))
 (defvar *msg6* (format nil ":kire!~~eenge@216.248.178.227 PRIVMSG cl-irc heyhey!~A" #\Return))
+(defvar *msg7* (format nil ":ChanServ!ChanServ@services. MODE #lisppaste +o eh "))
 
 
 (deftest find-reply-name.1 (irc:find-reply-name 1) :rpl_welcome)
@@ -66,3 +67,7 @@
 (deftest no-trailing.1
   (irc::parse-raw-message *msg6*)
   "kire" "~eenge" "216.248.178.227" "PRIVMSG" ("cl-irc" "heyhey!"))
+
+(deftest mode.1
+  (irc::parse-raw-message *msg7*)
+  "ChanServ" "ChanServ" "services." "MODE" ("#lisppaste" "+o" "eh"))

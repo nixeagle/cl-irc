@@ -50,7 +50,7 @@ present."
 arguments part of the message as a list.  Returns nil if the arguments
 part is not present."
   (multiple-value-bind (end-position return-argument)
-      (cut-before string " :" '(#\Return) :start start)
+      (cut-before string " :" '(#\Return) :start start :cut-to-end t)
     (values end-position (tokenize-string return-argument
                                           :delimiters '(#\Space)))))
 
