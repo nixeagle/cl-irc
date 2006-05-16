@@ -18,6 +18,7 @@
              :destructuring-arguments
              :socket-connect
              :server-name
+             :server-port
              :no-such-reply
              :irc-mode
              :boolean-value-mode
@@ -61,6 +62,7 @@
              :irc-message
              :source
              :user
+             :password
              :host
              :command
              :arguments

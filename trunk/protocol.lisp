@@ -110,10 +110,18 @@ user class.")))
   ((user
     :initarg :user
     :accessor user)
+   (password
+    :initarg :password
+    :accessor password
+    :initform nil)
    (server-name
     :initarg :server-name
     :accessor server-name
     :initform "Unknown server")
+   (server-port
+    :initarg :server-port
+    :accessor server-port
+    :initform *default-irc-server-port*)
    (network-stream
     :initarg :network-stream
     :accessor network-stream
@@ -188,7 +196,9 @@ this stream.")
 
 (defun make-connection (&key (connection-type 'connection)
                              (user nil)
+                             (password nil)
                              (server-name "")
+                             (server-port nil)
                              (network-stream nil)
                              (outgoing-external-format *default-outgoing-external-format*)
                              (client-stream t)
@@ -199,7 +209,9 @@ this stream.")
                          :external-format (external-format-fixup outgoing-external-format)))
          (connection (make-instance connection-type
                                    :user user
+                                   :password password
                                    :server-name server-name
+                                   :server-port server-port
                                    :network-stream network-stream
                                    :output-stream output-stream
                                    :client-stream client-stream)))
