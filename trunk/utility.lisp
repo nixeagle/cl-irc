@@ -146,7 +146,7 @@ parse-integer) on each of the string elements."
 
 (defun substring (string start &optional end)
   (let* ((end-index (if end end (length string)))
-         (seq-len (1- (- end-index start))))
+         (seq-len (- end-index start)))
     (make-array seq-len
                 :element-type (array-element-type string)
                 :displaced-to string
