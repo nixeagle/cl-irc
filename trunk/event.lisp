@@ -70,31 +70,55 @@ objects in sync."))
     (declare (ignore target))
     (let* ((connection (connection message))
            (current-case-mapping (case-map-name connection)))
-      (setf (server-capabilities connection)
-            (reduce #'(lambda (x y)
-                        ;; O(n^2), but we're talking small lists anyway...
-                        ;; maybe I should have chosen a hash interface
-                        ;; after all...
-                        (if (assoc (first y) x :test #'string=)
-                            x
-                          (cons y x)))
-                    (append
-                     (mapcar #'(lambda (x)
-                                 (let ((eq-pos (position #\= x)))
-                                   (if eq-pos
-                                       (list (substring x 0 eq-pos)
-                                             (substring x (1+ eq-pos)))
-                                     (list x)))) capabilities)
-                     (server-capabilities connection))
-                    :initial-value '()))
-      (setf (channel-mode-descriptions connection)
-            (chanmode-descs-from-isupport (server-capabilities connection))
-            (nick-prefixes connection)
-            (nick-prefixes-from-isupport (server-capabilities connection)))
-      (when (not (equal current-case-mapping
-                        (case-map-name connection)))
-        ;; we need to re-normalize nicks and channel names
-        (re-apply-case-mapping connection)))))
+      (flet ((split-arg (x)
+                (let ((eq-pos (position #\= x)))
+                  (if eq-pos
+                      (list (substring x 0 eq-pos)
+                            (substring x (1+ eq-pos)))
+                    (list x))))
+             (decode-arg (text)
+                ;; decode \xHH into (char-code HH)
+                ;; btw: how should that work with multibyte utf8?
+                (format nil "~{~A~}"
+                        (do* ((start 0 (+ 4 pos))
+                              (pos (search "\\x" text)
+                                   (search "\\x" text :start2 (1+ pos)))
+                              (points))
+                            ((null pos)
+                             (reverse (push (substring text start) points)))
+                          (push (substring text start pos) points)
+                          (push (code-char (parse-integer text
+                                                          :start (+ 2 pos)
+                                                          :end (+ 4 pos)
+                                                          :junk-allowed nil
+                                                          :radix 16))
+                                points))))
+             (negate-param (param)
+                 (if (eq #\- (char (first param) 0))
+                     (assoc (substring (first param) 1)
+                            *default-isupport-values*
+                            :test #'string=)
+                   param)))
+
+        (setf (server-capabilities connection)
+              (reduce #'(lambda (x y)
+                          (adjoin y x :key #'first :test #'string=))
+                      (append
+                       (remove nil (mapcar #'negate-param
+                                           (mapcar #'(lambda (x)
+                                                       (mapcar #'decode-arg x))
+                                                   (mapcar #'split-arg
+                                                           capabilities))))
+                       (server-capabilities connection))
+                      :initial-value '()))
+        (setf (channel-mode-descriptions connection)
+              (chanmode-descs-from-isupport (server-capabilities connection))
+              (nick-prefixes connection)
+              (nick-prefixes-from-isupport (server-capabilities connection)))
+        (when (not (equal current-case-mapping
+                          (case-map-name connection)))
+          ;; we need to re-normalize nicks and channel names
+          (re-apply-case-mapping connection))))))
 
 (defmethod default-hook ((message irc-rpl_whoisuser-message))
   (destructuring-bind
