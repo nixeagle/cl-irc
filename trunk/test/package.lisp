@@ -7,6 +7,6 @@
 
 (eval-when (:execute :load-toplevel :compile-toplevel)
   (defpackage :cl-irc-test
-      (:use :cl :rt)
+      (:use :cl :rt :cl-irc)
     (:nicknames :cl-irc-test)
     (:export :do-tests)))

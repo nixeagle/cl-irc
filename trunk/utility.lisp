@@ -1,5 +1,5 @@
 ;;;; $Id$
-;;;; $Source$
+;;;; $URL$
 
 ;;;; See the LICENSE file for licensing information.
 
@@ -215,65 +215,115 @@ returned."
 ;; Message arguments binding macro
 ;;
 
-
 (defmacro destructuring-arguments (lambda-list message &body body)
-  "Destructures the arguments slot in MESSAGE according
-to LAMBDA-LIST and binds them in BODY.
-destructuring-irc-message-arguments's lambda list syntax is as follows:
+  "Destructures the `arguments' slot in `message' according
+to `lambda-list' and binds them in `body'.
 
+The lambda list syntax is as follows:
+
+wholevar::= &whole var
 reqvars::= var*
-optvars::= [&optional {var | (var [init-form [supplied-p-parameter]])}*]
+optvars::= [&optional {var | (var [init-form [supplied-p-parameter]])}* ]
 restvar::= [&rest var]
-wholevar::= [&whole var]
-lastvar::= [&last var]
-lambda-list::= (wholevar reqvars optvars restvar lastvar)
+reqtrailingvars::= [&req var*]
+lambda-list::= (wholevar reqvars optvars restvar reqtrailingvars)
 
-With the exception of &last, all lambda list keywords are
-analogous to a destructuring lambda list's (see clhs 3.4.5).
+With the exception of &req (which is new) and &rest, all lambda list
+keywords are analogous to a destructuring lambda list (see clhs 3.4.5).
 
-If &last is given, the specified variable is bound to the last
-argument in the message. Specifying &last implies that all
-arguments past the last of the required variables will be
-ignored, even if there is no &rest lambda list keyword present.
+If &req is specified, these values are consumed off the end of the list
+before processing any preceeding &optional or &rest keywords.
 
-If both &rest and &last are specified, the last element in the
-list is also included in the rest list."
-  (let ((valid-bare-ll-keywords '(&optional &rest &whole))
-        (nothing (gensym))
-        (%message (gensym)))
-    (labels ((keyword-ll-entry-p (entry)
-               (eql (schar (symbol-name entry) 0) #\&))
-             (valid-bare-ll-entry-p (entry)
-               (or (not (keyword-ll-entry-p entry))
-                   (member entry valid-bare-ll-keywords :test 'string=)))
-             (append-&rest-p (last-entries destructuring-ll)
-              (not (or (null last-entries)
-                       (member '&rest destructuring-ll :test 'string=)))))
-      (let* ((last-entries (member '&last lambda-list :test 'string=))
-             (last-variable (second last-entries))
-             (destructuring-ll (butlast lambda-list (length last-entries)))
-             (invalid-ll-entries (remove-if #'valid-bare-ll-entry-p
-                                            destructuring-ll)))
-        (unless (or (null last-entries) (= 2 (length last-entries)))
-          (error "Invalid number of &last arguments in ~S" lambda-list))
-        (when (and last-variable (member last-variable destructuring-ll))
-          (error "Duplicate entry ~S in lambda list ~S"
-                 last-variable lambda-list))
-        (when invalid-ll-entries
-          (error "Invalid lambda list entries ~S found in ~S"
-                 invalid-ll-entries lambda-list))
-        `(let ((,%message ,message))
-           (let (,@(when last-entries
-                     `((,last-variable (car (last (arguments ,%message)))))))
-             (destructuring-bind ,(if (append-&rest-p last-entries
-                                                      destructuring-ll)
-                                      (append destructuring-ll
-                                              `(&rest ,nothing))
-                                      destructuring-ll)
-                 (arguments ,%message)
-               ,@(when (append-&rest-p last-entries destructuring-ll)
-                   `((declare (ignore ,nothing))))
-               ,@body)))))))
+For any variable, the `:ignored' keyword can be passed instead,
+indicating the binding should be ignored in the `body'."
+  (let ((%message (gensym))
+        (%args (gensym))
+        (%arg-count (gensym))
+        (valid-keywords '(&whole &optional &rest &req)))
+    (labels ((lambda-key-p (x)
+                (member x valid-keywords))
+             (ignored-p (x)
+                (eq x :ignored))
+             (count-valid-keys (lambda-list)
+                (count-if #'lambda-key-p lambda-list))
+             (replace-ignored (lambda-list)
+                (let ((ignores))
+                  (values (mapcar #'(lambda (x)
+                                      (if (ignored-p x)
+                                          (let ((y (gensym)))
+                                            (push y ignores)
+                                            y)
+                                        x))
+                                  lambda-list)
+                          ignores)))
+             (bind-req-trail (req-trail args body)
+                (let ((req-syms (cdr req-trail)))
+                  (if (and req-trail
+                           (notevery #'ignored-p req-syms))
+                      (multiple-value-bind
+                          (ll ignores) (replace-ignored req-syms)
+                        `(destructuring-bind
+                             ,ll ,args
+                           ,(if ignores
+                                `(declare (ignore ,@ignores))
+                              (values))
+                           ,body))
+                    body))))
+
+      (let* ((whole-var (when (eq (car lambda-list) '&whole)
+                          (second lambda-list)))
+             (lambda-list (if whole-var (nthcdr 2 lambda-list) lambda-list))
+             (opt-entries (member '&optional lambda-list))
+             (rest-entries (member '&rest lambda-list))
+             (req-trail (member '&req lambda-list))
+             (destructuring-ll (butlast lambda-list (length req-trail)))
+             (longest-sublist (cond
+                               (opt-entries opt-entries)
+                               (rest-entries rest-entries)
+                               (req-trail req-trail)
+                               (t nil)))
+             (min-entries (+ (if req-trail (1- (length req-trail)) 0)
+                             ;; required start && end
+                             (- (- (length lambda-list)
+                                   (count-valid-keys lambda-list))
+                                (- (length longest-sublist)
+                                   (count-valid-keys longest-sublist)))))
+             (max-entries (when (null rest-entries)
+                            ;; required start && end && optionals
+                            (+ min-entries
+                               (if opt-entries
+                                   (- (1- (length opt-entries))
+                                      (length req-trail))
+                                 0)))))
+
+        `(let* ((,%message ,message)
+                (,%args (arguments ,%message))
+                (,%arg-count (length ,%args))
+                ,@(if (and whole-var
+                           (not (ignored-p whole-var)))
+                      `((,whole-var ,%args))
+                    (values)))
+           (when ,(if max-entries
+                       `(not (and (<= ,min-entries ,%arg-count)
+                                  (<= ,%arg-count ,max-entries)))
+                     `(> ,min-entries ,%arg-count))
+             ;; we want to raise a cl-irc condition here!
+             (error "Unexpected protocol input"))
+           ,(bind-req-trail
+              req-trail
+              `(last ,%args ,(1- (length req-trail)))
+              (multiple-value-bind
+                  (ll ignores) (replace-ignored destructuring-ll)
+                `(destructuring-bind
+                     ,ll
+                     ,(if req-trail
+                          `(butlast ,%args ,(1- (length req-trail)))
+                        %args)
+                   ,(if ignores
+                        `(declare (ignore ,@ignores))
+                      (values))
+                   ,@body))))))))
+
 
 ;;
 ;; RPL_ISUPPORT support routines

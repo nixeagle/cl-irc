@@ -1,5 +1,5 @@
 ;;;; $Id$
-;;;; $Source$
+;;;; $URL$
 
 ;;;; See the LICENSE file for licensing information.
 
@@ -16,11 +16,11 @@
     :version "0.1.0"
     :licence "MIT"
     :description "Tests for the cl-irc system"
-    :depends-on
-      #+sbcl (:sb-bsd-sockets :split-sequence :rt :cl-irc)
-      #-sbcl (:split-sequence :rt :cl-irc)
+    :depends-on (:split-sequence :rt :cl-irc)
     :components ((:file "package")
                  (:file "test-parse-message"
                         :depends-on ("package"))
                  (:file "test-protocol"
-                        :depends-on ("test-parse-message"))))
+                        :depends-on ("test-parse-message"))
+                 (:file "test-binding-macro"
+                        :depends-on ("package"))))

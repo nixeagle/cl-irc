@@ -1,5 +1,5 @@
 ;;;; $Id$
-;;;; $Source$
+;;;; $URL$
 
 ;;;; See the LICENSE file for licensing information.
 
@@ -16,6 +16,7 @@
              :start-background-message-handler
              :stop-background-message-handler
              :destructuring-arguments
+             :&req
              :socket-connect
              :server-name
              :server-port
