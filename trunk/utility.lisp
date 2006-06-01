@@ -308,7 +308,8 @@ indicating the binding should be ignored in the `body'."
                                   (<= ,%arg-count ,max-entries)))
                      `(> ,min-entries ,%arg-count))
              ;; we want to raise a cl-irc condition here!
-             (error "Unexpected protocol input"))
+             (error (format nil "Unexpected protocol input; provided arguments ~
+~S don't match with expected arguments ~S" ',lambda-list ,%args)))
            ,(bind-req-trail
               req-trail
               `(last ,%args ,(1- (length req-trail)))
