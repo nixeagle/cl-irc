@@ -509,7 +509,7 @@ user at this end can be reached via your normal connection object.")
     :initarg :visibility
     :accessor visibility
     :initform nil
-    :type '(member nil :public :private :secret :unknown))
+    :type (member nil :public :private :secret :unknown))
    (users
     :initarg :users
     :accessor users
