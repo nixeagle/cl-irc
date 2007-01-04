@@ -249,8 +249,11 @@ registered."
                      (connection-type 'connection)
                      (logging-stream t))
   "Connect to server and return a connection object."
-  (let* ((stream (socket-connect server port))
+  (let* ((socket (usocket:socket-connect server port
+                                         :element-type 'flexi-streams:octet))
+         (stream (usocket:socket-stream socket))
          (connection (make-connection :connection-type connection-type
+                                      :socket socket
                                       :network-stream stream
                                       :client-stream logging-stream
                                       :server-name server))

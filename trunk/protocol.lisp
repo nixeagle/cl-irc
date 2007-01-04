@@ -122,6 +122,9 @@ user class.")))
     :initarg :server-port
     :accessor server-port
     :initform *default-irc-server-port*)
+   (socket
+    :initarg :socket
+    :documentation "Slot to store socket (for internal use only).")
    (network-stream
     :initarg :network-stream
     :accessor network-stream
@@ -199,6 +202,7 @@ this stream.")
                              (password nil)
                              (server-name "")
                              (server-port nil)
+                             (socket nil)
                              (network-stream nil)
                              (outgoing-external-format *default-outgoing-external-format*)
                              (client-stream t)
@@ -212,6 +216,7 @@ this stream.")
                                    :password password
                                    :server-name server-name
                                    :server-port server-port
+                                   :socket socket
                                    :network-stream network-stream
                                    :output-stream output-stream
                                    :client-stream client-stream)))

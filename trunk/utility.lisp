@@ -101,10 +101,6 @@ parse-integer) on each of the string elements."
         (fourth (ldb (byte 8 0) integer)))
     (vector first second third fourth)))
 
-(defun socket-connect (server port)
-  "Create a socket connected to `server':`port' and return stream for it."
-  (trivial-sockets:open-stream server port :element-type '(unsigned-byte 8)))
-
 (defun external-format-fixup (format)
   (let ((new-format (copy-list format)))
     (setf (getf (cdr new-format) :eol-style) :crlf)
