@@ -972,6 +972,8 @@ may be already be on."
 (defclass standard-ctcp-message (ctcp-mixin irc-message) ())
 
 (defgeneric find-ctcp-message-class (type))
+(defgeneric ctcp-request-p (message))
+(defgeneric ctcp-reply-p (message))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun define-ctcp-message (ctcp-command)

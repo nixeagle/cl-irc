@@ -155,7 +155,7 @@ objects in sync."))
     (destructuring-bind
         (nick chan-visibility channel names)
         (arguments message)
-      (declare (ignore nick chan-visibility))
+      (declare (ignore nick))
       (let ((channel (find-channel connection channel)))
         (setf (visibility channel)
               (or (car (assoc chan-visibility
