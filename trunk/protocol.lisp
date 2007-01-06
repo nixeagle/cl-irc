@@ -185,7 +185,6 @@ this stream.")
 (defgeneric client-raw-log (connection message))
 (defgeneric connectedp (connection))
 (defgeneric read-message (connection))
-(defgeneric start-process (function name))
 (defgeneric read-irc-message (connection))
 (defgeneric send-irc-message (connection command &rest arguments))
 (defgeneric get-hooks (connection class))
@@ -276,7 +275,9 @@ input."
 
 (defvar *process-count* 0)
 
-(defmethod start-process (function name)
+(defun start-process (function name)
+  "Internal helper for the DEPRECATED function
+START-BACKGROUND-MESSAGE-HANDLER and therefore DEPRECATED itself."
   (declare (ignorable name))
   #+allegro (mp:process-run-function name function)
   #+cmu (mp:make-process function :name name)
@@ -287,30 +288,41 @@ input."
 
 (defun start-background-message-handler (connection)
   "Read messages from the `connection', parse them and dispatch
-irc-message-event on them. Returns background process ID if available."
-  (flet (#-(and sbcl (not sb-thread))
-           (do-loop () (read-message-loop connection)))
+irc-message-event on them. Returns background process ID if available.
+
+This function has been DEPRECATED.  The function body is meant as an
+example for library users on handling connection input.  Users
+are strongly encouraged to implement error handling (which is lacking
+from the prototype given here."
+  (warn "START-BACKGROUND-MESSAGE-HANDLER has been deprecated and
+is up for removal in a next release.")
+
+  #+(and sbcl (not sb-thread))
+  (flet ((select-handler (fd)
+            (declare (ignore fd))
+            (if (listen (network-stream connection))
+                (read-message connection)
+              ;; select() returns with no
+              ;; available data if the stream
+              ;; has been closed on the other
+              ;; end (EPIPE)
+              (sb-sys:invalidate-descriptor
+               (sb-sys:fd-stream-fd
+                (network-stream connection))))))
+    (sb-sys:add-fd-handler (sb-sys:fd-stream-fd
+                            (network-stream connection))
+                           :input #'select-handler))
+
+  #-(and sbcl (not sb-thread))
+  (flet ((do-loop () (read-message-loop connection)))
     (let ((name (format nil "irc-hander-~D" (incf *process-count*))))
-      (declare (ignorable name))
-      #+(or allegro cmu lispworks sb-thread openmcl armedbear)
-      (start-process #'do-loop name)
-      #+(and sbcl (not sb-thread))
-      (sb-sys:add-fd-handler (sb-sys:fd-stream-fd
-                              (network-stream connection))
-                             :input (lambda (fd)
-                                      (declare (ignore fd))
-                                      (if (listen (network-stream connection))
-                                          (read-message connection)
-                                        ;; select() returns with no
-                                        ;; available data if the stream
-                                        ;; has been closed on the other
-                                        ;; end (EPIPE)
-                                        (sb-sys:invalidate-descriptor
-                                         (sb-sys:fd-stream-fd
-                                          (network-stream connection)))))))))
+      (start-process #'do-loop name))))
 
 (defun stop-background-message-handler (process)
-  "Stops a background message handler process returned by the start function."
+  "Stops a background message handler process returned by the start function.
+
+Just as its cousin START-BACKGROUND-MESSAGE-HANDLER,
+this function is DEPRECATED."
   (declare (ignorable process))
     #+cmu (mp:destroy-process process)
     #+allegro (mp:process-kill process)
