@@ -21,8 +21,8 @@
 (defgeneric squit (connection server comment))
 (defgeneric join (connection channel &key password))
 (defgeneric multi-join (connection channels))
-(defgeneric part (connection channel))
-(defgeneric part-all (connection))
+(defgeneric part (connection channel &optional reason))
+(defgeneric part-all (connection &optional reason))
 (defgeneric topic- (connection channel topic))
 (defgeneric names (connection channel &optional target))
 (defgeneric list- (connection &optional channel target))
@@ -159,16 +159,17 @@ registered."
   (dolist (channel channels)
     (join connection channel)))
 
-(defmethod part ((connection connection) (channel string))
-  (send-irc-message connection :part channel))
+(defmethod part ((connection connection) (channel string) &optional reason)
+  (apply #'send-irc-message
+         connection :part channel (when reason (list reason))))
 
-(defmethod part ((connection connection) (channel channel))
-  (part connection (name channel)))
+(defmethod part ((connection connection) (channel channel) &optional reason)
+  (part connection (name channel) reason))
 
 ;; utility function not part of the RFC
-(defmethod part-all ((connection connection))
+(defmethod part-all ((connection connection) &optional reason)
   (dolist (channel (channels connection))
-    (part connection (name channel))))
+    (part connection (name channel) reason)))
 
 (defmethod topic- ((connection connection) (channel string) (topic string))
   (send-irc-message connection :topic channel topic))
