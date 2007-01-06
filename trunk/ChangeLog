@@ -1,3 +1,22 @@
+
+Changes in 0.8 since 0.7:
+
+ * The library tracks user and channel modes automatically
+ * The concept of 'trailing-argument' removed (non-RFC compliance)
+ * Socket support now through 'usocket' library
+ * Threading support deprecated; use 'bordeaux-threads' or 'clim-sys' instead
+ * Support for password protected network logon
+ * Joining password protected channels now supported
+ * Specifying a reason phrase when parting channels now supported
+ * 'irc-message-event' now specializable on the default connection class
+ * RPL_ISUPPORT fixes
+ * Message parsing closer to specs in RFC
+ * Support for specified outgoing external-format
+ * Support for specified incoming external-format (with fallback)
+ * Stop leaking 'invalidate-me' conditions (by removing them completely)
+ * DCC support enhancements
+ * More generic functions to silence compiler warnings
+
 2005-03-21  Erik Huelsmann  <ehuelsmann@common-lisp.net>
 
 	Add MODE tracking support.
