@@ -13,7 +13,7 @@
 (defsystem cl-irc
     :name "cl-irc"
     :author "Erik Enge & Contributors"
-    :version "0.5.2"
+    :version "0.8-dev"
     :licence "MIT"
     :description "Common Lisp interface to the IRC protocol"
     :depends-on (:split-sequence :usocket :flexi-streams)
