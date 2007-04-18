@@ -315,7 +315,7 @@ objects in sync."))
       (let* ((channel (find-channel connection channel))
              (user (find-user connection nick)))
         (when (and user channel)
-          (if (self-message-p message)
+          (if (user-eq-me-p connection user)
               (remove-channel user channel)
             (remove-user channel user)))))))
 

@@ -914,6 +914,7 @@ may be already be on."
   (car (last (arguments message))))
 
 (defgeneric self-message-p (message))
+(defgeneric user-eq-me-p (connection user))
 (defgeneric find-irc-message-class (type))
 (defgeneric client-log (connection message &optional prefix))
 (defgeneric apply-to-hooks (message))
@@ -922,6 +923,13 @@ may be already be on."
   "Did we send this message?"
   (string-equal (source message)
                 (nickname (user (connection message)))))
+
+(defmethod user-eq-me-p (connection (user user))
+  (eq user (user connection)))
+
+(defmethod user-eq-me-p (connection (user string))
+  (let ((user (find-user connection user)))
+    (user-eq-me-p connection user)))
 
 (defclass irc-error-reply (irc-message) ())
 

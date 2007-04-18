@@ -85,6 +85,7 @@
              :remove-all-users
              :remove-user
              :self-message-p
+             :user-eq-me-p
              :pass
              :nick
              :user-
