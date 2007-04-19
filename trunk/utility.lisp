@@ -473,3 +473,44 @@ It returns a list of mode-description records."
                                      (find-user connection (pop arguments))
                                      (pop arguments)))) ops)))))))))))
 
+
+;;;
+;;; Hostmask matcher
+;;;
+
+(defun do-mask-match (mask hostname mask-consumed host-consumed)
+  (if (= (length mask) (1+ mask-consumed))
+      ;; we're out of mask to match, hopefully, we're out of hostname too
+      (= (length hostname) (1+ host-consumed))
+    (let ((mask-char (char mask (1+ mask-consumed))))
+      (cond
+       ((eq mask-char #\?)
+        ;; match any character, if there is one
+        (do-mask-match mask hostname (1+ mask-consumed) (1+ host-consumed)))
+       ((eq mask-char #\*)
+        ;; match any number of characters (including zero)
+        (do ((match (do-mask-match mask hostname
+                                   (incf mask-consumed)
+                                   host-consumed)
+                    (do-mask-match mask hostname
+                                   mask-consumed
+                                   (incf host-consumed))))
+            ((or (= (length hostname) (1+ host-consumed))
+                 match)
+             match)))
+       ((= (1+ host-consumed) (length hostname))
+        ;; we're out of hostname...
+        nil)
+       (t
+        ;; match other characters by exact matches
+        (when (eq mask-char (char hostname (1+ host-consumed)))
+          (do-mask-match mask hostname
+                         (1+ mask-consumed) (1+ host-consumed))))))))
+
+  (defun mask-matches-p (mask hostname)
+    "Wildcard matching.
+
+Uses `*' to match any number of characters and `?' to match exactly any
+one character.  The routine does not enforce hostmask matching patterns,
+but can be used for the purpose."
+    (do-mask-match mask hostname -1 -1))
