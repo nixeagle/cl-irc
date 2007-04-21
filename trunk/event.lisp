@@ -12,8 +12,8 @@ message."))
 
 (defmethod irc-message-event (connection (message irc-message))
   (declare (ignore connection))
-  (apply-to-hooks message)
-  (client-log (connection message) message "UNHANDLED-EVENT:"))
+  (unless (apply-to-hooks message)
+    (client-log (connection message) message "UNHANDLED-EVENT:")))
 
 
 (defgeneric default-hook (message)

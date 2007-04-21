@@ -993,10 +993,17 @@ may be already be on."
             (car (last (arguments message))))
     (force-output stream)))
 
+
 (defmethod apply-to-hooks ((message irc-message))
-  (let ((connection (connection message)))
-    (dolist (hook (get-hooks connection (class-name (class-of message))))
-      (funcall hook message))))
+  "Applies any applicable hooks to `message'.
+
+Returns non-nil if any of the hooks do."
+  (let ((connection (connection message))
+        (result nil))
+    (dolist (hook (get-hooks connection (class-name (class-of message)))
+                  result)
+      (setf result (or (funcall hook message)
+                       result)))))
 
 ;;
 ;; CTCP Message
