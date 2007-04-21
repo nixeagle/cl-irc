@@ -365,15 +365,13 @@ character array with the input read."
                                        :element-type '(unsigned-byte 8)
                                        :fill-pointer t)
                            '(10))
-    ;; remove all trailing CR*LF characters (This allows CRCRLF as a line
-    ;; separator too.
-    (do ((ch (aref buf (1- buf-len))
-             (aref buf (1- buf-len))))
-        ((or (not (or (eq ch 10)
-                      (eq ch 13)))
-             (= buf-len 0)))
-      (decf buf-len))
-    (setf (fill-pointer buf) buf-len)
+    (setf (fill-pointer buf)
+          ;; remove all trailing CR and LF characters
+          ;; (This allows non-conforming clients to send CRCRLF
+          ;;  as a line separator too).
+          (or (position-if #'(lambda (x) (member x '(10 13)))
+                           buf :from-end t :end buf-len)
+              buf-len))
     (try-decode-line buf *default-incoming-external-formats*)))
 
 (defmethod read-irc-message ((connection connection))
