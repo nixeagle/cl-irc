@@ -365,21 +365,22 @@ character array with the input read."
                                        :element-type '(unsigned-byte 8)
                                        :fill-pointer t)
                            '(10))
-    (setf (fill-pointer buf)
-          ;; remove all trailing CR and LF characters
-          ;; (This allows non-conforming clients to send CRCRLF
-          ;;  as a line separator too).
-          (or (position-if #'(lambda (x) (member x '(10 13)))
-                           buf :from-end t :end buf-len)
-              buf-len))
-    (try-decode-line buf *default-incoming-external-formats*)))
+    (when (< 0 buf-len)
+      (setf (fill-pointer buf)
+            ;; remove all trailing CR and LF characters
+            ;; (This allows non-conforming clients to send CRCRLF
+            ;;  as a line separator too).
+            (or (position-if #'(lambda (x) (member x '(10 13)))
+                             buf :from-end t :end buf-len)
+                buf-len))
+      (try-decode-line buf *default-incoming-external-formats*))))
 
 (defmethod read-irc-message ((connection connection))
   "Read and parse an IRC-message from the `connection'."
   (handler-case
    (let* ((msg-string (read-protocol-line connection))
-          (message (create-irc-message msg-string)))
-     (setf (connection message) connection)
+          (message (when msg-string (create-irc-message msg-string))))
+     (when message (setf (connection message) connection))
      message)
   (end-of-file
    ;; satisfy read-message-loop assumption of nil when no more messages

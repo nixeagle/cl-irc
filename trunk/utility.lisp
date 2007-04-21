@@ -129,7 +129,7 @@ parse-integer) on each of the string elements."
     ;; For others, if this becomes an efficiency problem, please report...
     (loop for next-elt = (funcall read-fun stream nil nil)
           if (null next-elt)
-          do (return (values target targ-cur t))
+          do (return (values target (1+ targ-cur) t))
           else do
           (setf (elt target (incf targ-cur)) next-elt)
           (if (eql next-elt (aref limit-vector limit-cur))
