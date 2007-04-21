@@ -142,7 +142,7 @@ see http://www.irc.org/tech_docs/draft-brocklesby-irc-isupport-03.txt")
     :initarg :client-stream
     :accessor client-stream
     :initform t
-    :documentation "Messages coming back from the server is sent to
+    :documentation "Messages coming back from the server are sent to
 this stream.")
    (channels
     :initarg :channels
@@ -341,34 +341,52 @@ this function is DEPRECATED."
         do (multiple-value-setq (decoded error)
              (handler-case
               (flexi-streams:with-input-from-sequence (in line)
-                (let ((flexi (flexi-streams:make-flexi-stream in
-;;                                                              :element-type 'character
-                                                              :external-format
-                                                              (external-format-fixup external-format))))
+                (let* ((ex-fmt (external-format-fixup external-format))
+                       (flexi (flexi-streams:make-flexi-stream
+                               in
+                               ;; :element-type 'character
+                               :external-format ex-fmt)))
                   (read-line flexi nil nil)))
               (flexi-streams:flexi-stream-encoding-error ()
                   nil)))
         if decoded
         do (return decoded)))
 
+(defun read-protocol-line (connection)
+  "Reads a line from the input network stream, returning a
+character array with the input read."
+  (multiple-value-bind
+      (buf buf-len)
+      ;; Note: we cannot use read-line here (or any other
+      ;; character based functions), since they may cause
+      ;; (at this time unwanted) character conversion
+      (read-sequence-until (network-stream connection)
+                           (make-array 1024
+                                       :element-type '(unsigned-byte 8)
+                                       :fill-pointer t)
+                           '(10))
+    ;; remove all trailing CR*LF characters (This allows CRCRLF as a line
+    ;; separator too.
+    (do ((ch (aref buf (1- buf-len))
+             (aref buf (1- buf-len))))
+        ((or (not (or (eq ch 10)
+                      (eq ch 13)))
+             (= buf-len 0)))
+      (decf buf-len))
+    (setf (fill-pointer buf) buf-len)
+    (try-decode-line buf *default-incoming-external-formats*)))
+
 (defmethod read-irc-message ((connection connection))
   "Read and parse an IRC-message from the `connection'."
   (handler-case
-   (multiple-value-bind
-       (buf buf-len)
-       ;; Note: we cannot use read-line here (or any other
-       ;; character based functions), since they may cause conversion
-       (read-sequence-until (network-stream connection)
-                            (make-array 1024
-                                        :element-type '(unsigned-byte 8)
-                                        :fill-pointer t)
-                            '(13 10))
-     (setf (fill-pointer buf) buf-len)
-     (let* ((message (create-irc-message (try-decode-line buf *default-incoming-external-formats*))))
-       (setf (connection message) connection)
-       message))
-    (end-of-file ())))
-       ;; satisfy read-message-loop assumption of nil when no more messages
+   (let* ((msg-string (read-protocol-line connection))
+          (message (create-irc-message msg-string)))
+     (setf (connection message) connection)
+     message)
+  (end-of-file
+   ;; satisfy read-message-loop assumption of nil when no more messages
+   ())))
+
 
 (defmethod send-irc-message ((connection connection) command
                              &rest arguments)
