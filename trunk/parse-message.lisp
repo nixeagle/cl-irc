@@ -118,17 +118,21 @@ reply, nil otherwise."
                     type)
       type
       nil))
-                                                       
+
 (defun dcc-type-p (string type)
   "Is the `string' actually a representation of the DCC `type'?"
-  (case type
-    (:dcc-chat-request
-     (when (string-equal (char string 5) #\C)
-       :dcc-chat-request))
-    (:dcc-send-request
-     (when (string-equal (char string 5) #\S)
-       :dcc-send-request))
-    (otherwise nil)))
+  (let* ((args (tokenize-string (string-trim (list +soh+) string)))
+         (dcc (string-upcase (first args)))
+         (type (string-upcase (second args))))
+    (when (string= dcc "DCC")
+      (case type
+        (:dcc-chat-request
+         (when (string= type "CHAT")
+           :dcc-chat-request))
+        (:dcc-send-request
+         (when (string= type "SEND")
+           :dcc-send-request))
+        (otherwise nil)))))
 
 (defun ctcp-message-type (string)
   "If `string' is a CTCP message, return the type of the message or
