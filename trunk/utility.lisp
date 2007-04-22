@@ -106,6 +106,24 @@ parse-integer) on each of the string elements."
     (setf (getf (cdr new-format) :eol-style) :crlf)
     new-format))
 
+(defun try-decode-line (line external-formats)
+  (loop for external-format in external-formats
+        for decoded = nil
+        for error = nil
+        do (multiple-value-setq (decoded error)
+             (handler-case
+              (flexi-streams:with-input-from-sequence (in line)
+                (let* ((ex-fmt (external-format-fixup external-format))
+                       (flexi (flexi-streams:make-flexi-stream
+                               in
+                               ;; :element-type 'character
+                               :external-format ex-fmt)))
+                  (read-line flexi nil nil)))
+              (flexi-streams:flexi-stream-encoding-error ()
+                  nil)))
+        if decoded
+        do (return decoded)))
+
 (defun read-byte-no-hang (stream &optional eof-error-p eof-value)
   (declare (optimize (speed 3) (debug 0) (safety 0)))
   (when (listen stream)
@@ -139,6 +157,30 @@ parse-integer) on each of the string elements."
           if (or (= targ-cur targ-max)
                  (= limit-cur limit-max))
           do (return (values target (1+ targ-cur) nil)))))
+
+(defun read-protocol-line (connection)
+  "Reads a line from the input network stream, returning a
+character array with the input read."
+  (multiple-value-bind
+      (buf buf-len)
+      ;; Note: we cannot use read-line here (or any other
+      ;; character based functions), since they may cause
+      ;; (at this time unwanted) character conversion
+      (read-sequence-until (network-stream connection)
+                           (make-array 1024
+                                       :element-type '(unsigned-byte 8)
+                                       :fill-pointer t)
+                           '(10))
+    (when (< 0 buf-len)
+      (setf (fill-pointer buf)
+            ;; remove all trailing CR and LF characters
+            ;; (This allows non-conforming clients to send CRCRLF
+            ;;  as a line separator too).
+            (or (position-if #'(lambda (x) (member x '(10 13)))
+                             buf :from-end t :end buf-len)
+                buf-len))
+      (try-decode-line buf *default-incoming-external-formats*))))
+
 
 (defun substring (string start &optional end)
   (let* ((end-index (if end end (length string)))
