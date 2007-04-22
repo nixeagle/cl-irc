@@ -125,14 +125,38 @@ reply, nil otherwise."
          (dcc (string-upcase (first args)))
          (type (string-upcase (second args))))
     (when (string= dcc "DCC")
-      (case type
-        (:dcc-chat-request
-         (when (string= type "CHAT")
-           :dcc-chat-request))
-        (:dcc-send-request
-         (when (string= type "SEND")
-           :dcc-send-request))
-        (otherwise nil)))))
+      (let ((r
+             ;; the list below was found on Wikipedia and in kvirc docs
+             (second (assoc type '(("CHAT" :dcc-chat-request)
+                                   ("SEND" :dcc-send-request)
+                                   ("XMIT" :dcc-xmit-request)
+                                   ("SCHAT" :dcc-schat-request)
+                                   ("SSEND" :dcc-ssend-request)
+                                   ("REVERSE" :dcc-reverse-request)
+                                   ("RSEND" :dcc-rsend-request)
+                                   ("TSEND" :dcc-tsend-request)
+                                   ("STSEND" :dcc-stsend-request)
+                                   ("TSSEND" :dcc-stsend-request)
+                                   ("RESUME" :dcc-resume-request)
+                                   ("ACCEPT" :dcc-accept-request)
+                                   ;; GET
+                                   ;; TGET
+                                   ;; STGET
+                                   ;; TSGET
+                                   ;; RECV
+                                   ;; SRECV
+                                   ;; TRECV
+                                   ;; STRECV
+                                   ;; TSRECV
+                                   ;; RSEND
+                                   ;; SRSEND
+                                   ;; TRSEND
+                                   ;; STRSEND
+                                   ;; TSRSEND
+                                   ;; VOICE
+                                   ) :test #'string=))))
+        (when (eq r type)
+          type)))))
 
 (defun ctcp-message-type (string)
   "If `string' is a CTCP message, return the type of the message or
