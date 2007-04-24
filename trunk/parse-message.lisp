@@ -222,3 +222,17 @@ in the message."
         (when ctcp
           (setf (ctcp-command instance) ctcp))
         instance))))
+
+(defun create-dcc-message (string)
+  (let* ((class 'dcc-privmsg-message)
+         (ctcp (ctcp-message-type string)))
+    (when ctcp
+      (setf class (find-dcc-ctcp-message class ctcp)))
+    (let ((instance (make-instance class
+                                   :arguments (list string)
+                                   :connection nil
+                                   :received-time (get-universal-time)
+                                   :raw-message-string string)))
+      (when ctcp
+        (setf (ctcp-command instance) ctcp))
+      instance)))

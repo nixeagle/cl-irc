@@ -981,6 +981,61 @@ Returns non-nil if any of the hooks do."
                        result)))))
 
 ;;
+;; DCC CHAT messages
+;;
+
+(defclass dcc-message ()
+  ((connection
+    :initarg :connection
+    :accessor connection
+    :documentation "")
+   (arguments
+    :initarg :arguments
+    :accessor arguments
+    :type list
+    :documentation "")
+   (received-time
+    :initarg :received-time
+    :accessor received-time)
+   (raw-message-string
+    :initarg :raw-message-string
+    :accessor raw-message-string
+    :type sting))
+  (:documentation ""))
+
+(defmethod print-object ((object dcc-message) stream)
+  "Print the object for the Lisp reader."
+  (print-unreadable-object (object stream :type t :identity t)
+    (format stream "~A ~A"
+            (nickname (remote-user (connection object)))
+            (command object))))
+
+(defgeneric find-dcc-message-class (type))
+;;already defined in the context of IRC messages:
+;; (defgeneric client-log (connection message &optional prefix))
+;; (defgeneric apply-to-hooks (message))
+
+
+(export 'dcc-privmsg-message)
+(defclass dcc-privmsg-message (dcc-message) ())
+(defmethod find-dcc-message-class ((type (eql :privmsg)))
+  (find-class 'dcc-privmsg-message))
+
+(defmethod find-dcc-message-class (type)
+  (declare (ignore type))
+  (find-class 'dcc-message))
+
+(defmethod client-log ((connection dcc-connection)
+                       (message dcc-message) &optional (prefix ""))
+  (let ((stream (client-stream connection)))
+    (format stream "~A~A: ~{ ~A~} \"~A\"~%"
+            prefix
+            (received-time message)
+            (butlast (arguments message))
+            (car (last (arguments message))))
+    (force-output stream)))
+
+;;
 ;; CTCP Message
 ;;
 
