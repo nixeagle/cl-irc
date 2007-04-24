@@ -482,22 +482,21 @@ share a number of properties though."))
 
 ;; SEND related generic functions
 ;;<none yet, we don't do SEND yet...>
-
+(defmethod connectedp ((connection dcc-connection))
+  (let ((stream (network-stream connection)))
+    (and (streamp stream)
+         (open-stream-p stream))))
 
 (defmethod dcc-close ((connection dcc-connection))
   #+(and sbcl (not sb-thread))
   (sb-sys:invalidate-descriptor
    (sb-sys:fd-stream-fd (network-stream connection)))
-  (close (network-stream connection))
+  (ignore-errors
+    (close (network-stream connection)))
   (setf (remote-user connection) nil
         *dcc-connections* (remove connection *dcc-connections*)
         (dcc-connections (irc-connection connection))
         (remove connection (dcc-connections (irc-connection connection)))))
-
-(defmethod connectedp ((connection dcc-connection))
-  (let ((stream (network-stream connection)))
-    (and (streamp stream)
-         (open-stream-p stream))))
 
 ;;
 ;; Channel
