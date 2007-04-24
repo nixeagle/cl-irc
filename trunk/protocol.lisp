@@ -335,7 +335,8 @@ this function is DEPRECATED."
     #+openmcl (ccl:process-kill process)
     #+armedbear (ext:destroy-thread process))
 
-(defun read-message-loop (connection)
+(defgeneric read-message-loop (connection))
+(defmethod read-message-loop (connection)
   (loop while (read-message connection)))
 
 
@@ -360,11 +361,13 @@ server, via the `connection'."
     (force-output (output-stream connection))
     raw-message))
 
-(defmethod get-hooks ((connection connection) (class symbol))
+;;applies to both irc and dcc-connections
+(defmethod get-hooks (connection (class symbol))
   "Return a list of all hooks for `class'."
   (gethash class (hooks connection)))
 
-(defmethod add-hook ((connection connection) class hook)
+;;applies to both irc and dcc-connections
+(defmethod add-hook (connection class hook)
   "Add `hook' to `class'."
   (setf (gethash class (hooks connection))
         (pushnew hook (gethash class (hooks connection)))))
@@ -479,6 +482,9 @@ share a number of properties though."))
 
 ;; CHAT related generic functions
 (defgeneric send-dcc-message (connection message))
+;;already defined in relation to `connection'
+;; (defgeneric read-message (connection))
+;;(defgeneric dcc-message-event (message)) <defined in event.lisp>
 
 ;; SEND related generic functions
 ;;<none yet, we don't do SEND yet...>
@@ -486,6 +492,10 @@ share a number of properties though."))
   (let ((stream (network-stream connection)))
     (and (streamp stream)
          (open-stream-p stream))))
+
+(defmethod send-dcc-message ((connection dcc-connection) message)
+  (format (output-stream connection) "~A~%" message)
+  (force-output (network-stream connection)))
 
 (defmethod dcc-close ((connection dcc-connection))
   #+(and sbcl (not sb-thread))
@@ -497,6 +507,68 @@ share a number of properties though."))
         *dcc-connections* (remove connection *dcc-connections*)
         (dcc-connections (irc-connection connection))
         (remove connection (dcc-connections (irc-connection connection)))))
+
+
+(defclass dcc-chat-connection (dcc-connection)
+  ((output-stream
+    :initarg :output-stream
+    :initform nil
+    :accessor output-stream
+    :documentation "Stream used to communicate with the other end
+of the network pipe.")
+   (hooks
+    :initform (make-hash-table :test #'equal)
+    :accessor hooks))
+  (:documentation ""))
+
+
+(defun make-dcc-chat-connection (&key (remote-user nil)
+;;                                      (remote-address nil)
+;;                                      (remote-port nil)
+                                      (client-stream nil)
+                                      (irc-connection nil)
+                                      (close-on-main t)
+                                      (socket nil)
+                                      (network-stream nil)
+                                      (outgoing-external-format *default-outgoing-external-format*)
+                                      (hooks nil))
+  (let* ((output-stream (flexi-streams:make-flexi-stream
+                         network-stream
+                         :element-type 'character
+                         :external-format (external-format-fixup
+                                           outgoing-external-format)))
+         (connection (make-instance 'dcc-chat-connection
+                                    :remote-user remote-user
+                                    :client-stream client-stream
+                                    :output-stream output-stream
+                                    :irc-connection irc-connection
+                                    :close-on-main close-on-main
+                                    :socket socket
+                                    :network-stream network-stream)))
+    (dolist (hook hooks)
+      (add-hook connection (car hook) (cdar hook)))
+    connection))
+
+(defmethod read-message ((connection dcc-chat-connection))
+  (when (connectedp connection)
+    (let* ((msg-string (read-protocol-line connection))
+           (message (create-dcc-message msg-string)))
+      (setf (connection message) connection)
+      (when *debug-p*
+        (format *debug-stream* "~A" (describe message))
+        (force-output *debug-stream*))
+      (dcc-message-event connection message)
+      message))) ; needed because of the "loop while" in read-message-loop
+
+(defmethod read-message-loop ((connection dcc-chat-connection))
+  ;; no special setup
+  (call-next-method)
+  ;; now, make sure the connection was closed and cleaned up properly...
+  ;; it *was* the last message, after all...
+  ;;##TODO, maybe we need some kind of 'auto-clean' slot to indicate
+  ;; this is the desired behaviour?
+  )
+
 
 ;;
 ;; Channel
@@ -968,8 +1040,8 @@ may be already be on."
             (car (last (arguments message))))
     (force-output stream)))
 
-
-(defmethod apply-to-hooks ((message irc-message))
+;; applies to both irc- and dcc-messages
+(defmethod apply-to-hooks (message)
   "Applies any applicable hooks to `message'.
 
 Returns non-nil if any of the hooks do."

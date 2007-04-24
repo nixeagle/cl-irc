@@ -141,9 +141,11 @@
              :ison
              ;; DCC specific dictionary
              :dcc-connection
+             :dcc-chat-connection
              :irc-connection
              :close-on-main
              :remote-user
              :dcc-close
+             :make-dcc-chat-connection
              )))
 
