@@ -138,5 +138,12 @@
              :users-
              :wallops
              :userhost
-             :ison)))
+             :ison
+             ;; DCC specific dictionary
+             :dcc-connection
+             :irc-connection
+             :close-on-main
+             :remote-user
+             :dcc-close
+             )))
 

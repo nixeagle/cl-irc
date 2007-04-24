@@ -144,6 +144,10 @@ see http://www.irc.org/tech_docs/draft-brocklesby-irc-isupport-03.txt")
     :initform t
     :documentation "Messages coming back from the server are sent to
 this stream.")
+   (dcc-connections
+    :accessor dcc-connections
+    :initform '()
+    :documentation "The DCC connections associated with this IRC connection.")
    (channels
     :initarg :channels
     :accessor channels
@@ -417,18 +421,43 @@ server, via the `connection'."
 ;;
 
 (defclass dcc-connection ()
-  ((user
-    :initarg :user
-    :accessor user
+  ((irc-connection
+    :initarg :irc-connection
+    :accessor irc-connection
+    :initform nil
+    :documentation "The associated IRC connection used to send
+CTCP control commands.  When this connection is closed/lost,
+the DCC connection should be terminated too for security reasons.")
+   (close-on-main
+    :initarg :close-on-main
+    :accessor close-on-main
+    :initform t
+    :documentation "Makes sure that the DCC connection is closed
+as soon as either the IRC connection is actively closed or when
+a lost connection is detected.")
+   (remote-user
+    :initarg :remote-user
+    :accessor remote-user
     :documentation "The user at the other end of this connection.  The
 user at this end can be reached via your normal connection object.")
+   (socket
+    :initarg :socket
+    :accessor socket
+    :initform nil
+    :documentation "Socket used to do the remote client.")
    (network-stream
     :initarg :network-stream
     :accessor network-stream)
-   (output-stream
-    :initarg :output-stream
-    :accessor output-stream
-    :initform t)))
+   (client-stream
+    :initarg :client-stream
+    :accessor client-stream
+    :documentation "Input from the remote is sent to this stream."))
+  (:documentation "Abstract superclass of all types of DCC connections.
+
+This class isn't meant to be instanciated.  The different DCC subprotocols
+differ widely in the way they transmit their data, meaning there are
+relatively few methods which can be defined for this class.  They do
+share a number of properties though."))
 
 (defmethod print-object ((object dcc-connection) stream)
   "Print the object for the Lisp reader."
@@ -439,43 +468,31 @@ user at this end can be reached via your normal connection object.")
                 (hostname (user object)))
       "")))
 
-(defun make-dcc-connection (&key (user nil)
-                                 (remote-address nil)
-                                 (remote-port nil)
-                                 (output-stream t))
-  (make-instance 'dcc-connection
-                 :user user
-                 :network-stream (usocket:socket-connect remote-address
-                                                         remote-port)
-                 :output-stream output-stream))
 
-(defgeneric dcc-close (connection))
-(defgeneric send-dcc-message (connection message))
-
-(defmethod read-message ((connection dcc-connection))
-  (when (connectedp connection)
-    (let ((message (read-line (network-stream connection))))
-      (format (output-stream connection) "~A~%" message)
-      (force-output (output-stream connection))
-      (when *debug-p*
-        (format *debug-stream* "~A" (describe message)))
-      ;; (dcc-message-event message)
-      message))) ; needed because of the "loop while" in read-message-loop
-
-(defmethod send-dcc-message ((connection dcc-connection) message)
-  (format (network-stream connection) "~A~%" message)
-  (force-output (network-stream connection)))
+;; Common generic functions
 
 ;; argh.  I want to name this quit but that gives me issues with
 ;; generic functions.  need to resolve.
+(defgeneric dcc-close (connection))
+;;already defined in relation to `connection':
+;; (defgeneric connectedp (connection))
+
+;; CHAT related generic functions
+(defgeneric send-dcc-message (connection message))
+
+;; SEND related generic functions
+;;<none yet, we don't do SEND yet...>
+
+
 (defmethod dcc-close ((connection dcc-connection))
   #+(and sbcl (not sb-thread))
   (sb-sys:invalidate-descriptor
    (sb-sys:fd-stream-fd (network-stream connection)))
   (close (network-stream connection))
-  (setf (user connection) nil)
-  (setf *dcc-connections* (remove connection *dcc-connections*))
-  )
+  (setf (remote-user connection) nil
+        *dcc-connections* (remove connection *dcc-connections*)
+        (dcc-connections (irc-connection connection))
+        (remove connection (dcc-connections (irc-connection connection)))))
 
 (defmethod connectedp ((connection dcc-connection))
   (let ((stream (network-stream connection)))
