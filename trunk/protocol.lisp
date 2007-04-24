@@ -1020,8 +1020,20 @@ Returns non-nil if any of the hooks do."
 (defmethod ctcp-request-p ((message ctcp-mixin))
   (string= (command message) :privmsg))
 
+(defmethod ctcp-request-p (message)
+  ;; If we're not calling the above method, then, obviously
+  ;; this was never a ctcp-thing to start with
+  (declare (ignore message))
+  nil)
+
 (defmethod ctcp-reply-p ((message ctcp-mixin))
   (string= (command message) :notice))
+
+(defmethod ctcp-reply-p (message)
+  (declare (ignore message))
+  ;; If we're not calling the above method, then, obviously
+  ;; this was never a ctcp-thing to start with
+  nil)
 
 (defmethod client-log ((connection connection) (message ctcp-mixin) &optional (prefix ""))
   (let ((stream (client-stream connection)))
