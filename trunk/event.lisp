@@ -15,6 +15,16 @@ message."))
   (unless (apply-to-hooks message)
     (client-log (connection message) message "UNHANDLED-EVENT:")))
 
+(defgeneric dcc-message-event (connection message)
+  (:documentation "Upon receipt of an IRC message from the
+connection's stream, irc-message-event will be called with the
+message."))
+
+(defmethod dcc-message-event (connection (message dcc-message))
+  (declare (ignore connection))
+  (unless (apply-to-hooks message)
+    (client-log (connection message) message "UNHANDLED-EVENT:")))
+
 
 (defgeneric default-hook (message)
   (:documentation "Minimum action to be executed upon reception
