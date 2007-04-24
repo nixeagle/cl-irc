@@ -146,6 +146,7 @@
              :close-on-main
              :remote-user
              :dcc-close
+             :dcc-message
              :dcc-message-event
              :make-dcc-chat-connection
              )))

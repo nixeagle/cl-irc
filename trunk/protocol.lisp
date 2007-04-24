@@ -1117,12 +1117,21 @@ Returns non-nil if any of the hooks do."
     :accessor ctcp-command)))
 
 (defclass standard-ctcp-message (ctcp-mixin irc-message) ())
+(defclass standard-dcc-ctcp-message (ctcp-mixin dcc-message) ())
 
 (defgeneric find-ctcp-message-class (type))
+(defgeneric find-dcc-ctcp-message-class (type))
 (defgeneric ctcp-request-p (message))
 (defgeneric ctcp-reply-p (message))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun define-dcc-ctcp-message (ctcp-command)
+    (let ((name (intern-message-symbol :dcc-ctcp ctcp-command)))
+      `(progn
+        (defmethod find-dcc-ctcp-message-class ((type (eql ,ctcp-command)))
+          (find-class ',name))
+        (export ',name)
+        (defclass ,name (ctcp-mixin dcc-message) ()))))
   (defun define-ctcp-message (ctcp-command)
     (let ((name (intern-message-symbol :ctcp ctcp-command)))
       `(progn
@@ -1132,7 +1141,8 @@ Returns non-nil if any of the hooks do."
         (defclass ,name (ctcp-mixin irc-message) ())))))
 
 (defmacro create-ctcp-message-classes (class-list)
-  `(progn ,@(mapcar #'define-ctcp-message class-list)))
+  `(progn ,@(mapcar #'define-ctcp-message class-list)
+          ,@(mapcar #'define-dcc-ctcp-message class-list)))
 
 ;; should perhaps wrap this in an eval-when?
 (create-ctcp-message-classes (:action :source :finger :ping
@@ -1142,6 +1152,10 @@ Returns non-nil if any of the hooks do."
 (defmethod find-ctcp-message-class (type)
   (declare (ignore type))
   (find-class 'standard-ctcp-message))
+
+(defmethod find-dcc-ctcp-message-class (type)
+  (declare (ignore type))
+  (find-class 'standard-dcc-ctcp-message))
 
 (defmethod ctcp-request-p ((message ctcp-mixin))
   (string= (command message) :privmsg))
