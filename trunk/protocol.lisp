@@ -462,10 +462,10 @@ share a number of properties though."))
 (defmethod print-object ((object dcc-connection) stream)
   "Print the object for the Lisp reader."
   (print-unreadable-object (object stream :type t :identity t)
-    (if (user object)
+    (if (remote-user object)
         (format stream "with ~A@~A"
-                (nickname (user object))
-                (hostname (user object)))
+                (nickname (remote-user object))
+                (hostname (remote-user object)))
       "")))
 
 
