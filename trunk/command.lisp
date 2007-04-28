@@ -58,6 +58,7 @@
 (defgeneric userhost (connection nickname))
 (defgeneric ison (connection user))
 (defgeneric ctcp (connection target message))
+(defgeneric ctcp-reply (connection target message))
 (defgeneric ctcp-chat-initiate (connection nickname))
 
 
@@ -347,6 +348,9 @@ registered."
 ;; utility functions not part of the RFC
 (defmethod ctcp ((connection connection) target message)
   (send-irc-message connection :privmsg target (make-ctcp-message message)))
+
+(defmethod ctcp-reply ((connection connection) target message)
+  (send-irc-message connection :notice target (make-ctcp-message message)))
 
 #|
 There's too much wrong with this method to fix it now.
