@@ -181,6 +181,30 @@ character array with the input read."
                 buf-len))
       (try-decode-line buf *default-incoming-external-formats*))))
 
+(defmacro dynfound-funcall ((symbol-name &optional package) &rest parameters)
+  (let ((package-sym (gensym))
+        (symbol-sym (gensym))
+        (fun-sym (gensym)))
+    `(let* ((,package-sym ,(if package package *package*))
+            (,symbol-sym ,(if (symbolp symbol-name)
+                              `',symbol-name
+                            symbol-name))
+            (,symbol-sym (find-symbol
+                          ,(if (symbolp symbol-name)
+                               `(symbol-name ,symbol-sym)
+                             `(if (symbolp ,symbol-sym)
+                                  (symbol-name ,symbol-sym)
+                                ,symbol-sym))
+                          ,package-sym))
+            (,fun-sym (when (and ,symbol-sym (fboundp ,symbol-sym))
+                        (symbol-function ,symbol-sym))))
+       (unless ,symbol-sym
+         (error "Can't resolve symbol ~A in package ~A"
+                ,symbol-sym ,package-sym))
+       (if ,fun-sym
+           (funcall ,fun-sym ,@parameters)
+         (error "Symbol ~A in package ~A isn't fbound"
+                ,symbol-sym ,package-sym)))))
 
 (defun substring (string start &optional end)
   (let* ((end-index (if end end (length string)))

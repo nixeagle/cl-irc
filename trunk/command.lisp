@@ -247,13 +247,29 @@ registered."
                      (password nil)
                      (mode 0)
                      (server *default-irc-server*)
-                     (port *default-irc-server-port*)
+                     (port :default)
                      (connection-type 'connection)
+                     (connection-security :none)
                      (logging-stream t))
-  "Connect to server and return a connection object."
-  (let* ((socket (usocket:socket-connect server port
+  "Connect to server and return a connection object.
+
+`port' and `connection-security' have a relation: when `port' equals
+`:default' `*default-irc-server-port*' is used to find which port to
+connect to.  `connection-security' determines which port number is found.
+
+`connection-security' can be either `:none' or `:ssl'.  When passing
+`:ssl', the cl+ssl library must have been loaded by the caller.
+"
+  (let* ((port (if (eq port :default)
+                   ;; get the default port for this type of connection
+                   (getf *default-irc-server-port* connection-security)
+                 port))
+         (socket (usocket:socket-connect server port
                                          :element-type 'flexi-streams:octet))
-         (stream (usocket:socket-stream socket))
+         (stream (if (eq connection-security :ssl)
+                     (dynfound-funcall (make-ssl-client-stream :cl+ssl)
+                                       (usocket:socket-stream socket))
+                   (usocket:socket-stream socket)))
          (connection (make-connection :connection-type connection-type
                                       :socket socket
                                       :network-stream stream

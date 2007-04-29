@@ -22,7 +22,9 @@
 
 (defvar *default-nickname* "cl-irc")
 (defvar *default-irc-server* "irc.freenode.net")
-(defvar *default-irc-server-port* 6667)
+(defvar *default-irc-server-port* '(:none 6667  ;; most used for normal IRC
+                                    :ssl  6679  ;; most used for SSL IRC
+                                    ))
 (defvar *default-quit-message*
   "Common Lisp IRC library - http://common-lisp.net/project/cl-irc")
 
