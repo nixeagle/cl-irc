@@ -149,5 +149,9 @@
              :dcc-message
              :dcc-message-event
              :make-dcc-chat-connection
+             :ctcp-chat-initiate
+             :dcc-request-reject
+             :dcc-request-accept
+             :dcc-request-cancel
              )))
 

@@ -59,7 +59,19 @@
 (defgeneric ison (connection user))
 (defgeneric ctcp (connection target message))
 (defgeneric ctcp-reply (connection target message))
-(defgeneric ctcp-chat-initiate (connection nickname))
+(defgeneric ctcp-chat-initiate (connection nickname &key passive)
+  (:documentation "Initiate a DCC chat session with `nickname' associated
+with `connection'.
+
+If `passive' is non-NIL, the remote is requested to serve as a DCC
+host. Otherwise, the local system will serve as a DCC host.  The
+latter may be a problem for firewalled or NATted hosts."))
+(defgeneric dcc-request-accept (message)
+  (:documentation ""))
+(defgeneric dcc-request-reject (message &optional reason)
+  (:documentation ""))
+(defgeneric dcc-request-cancel (connection token)
+  (:documentation ""))
 
 
 (defmethod pass ((connection connection) (password string))
@@ -138,6 +150,9 @@ registered."
 (defmethod quit ((connection connection) &optional (message *default-quit-message*))
   (remove-all-channels connection)
   (remove-all-users connection)
+  (dolist (dcc (dcc-connections connection))
+    (when (close-on-main dcc)
+      (quit dcc "Main IRC server connection lost.")))
   (unwind-protect
       (send-irc-message connection :quit message)
     #+(and sbcl (not sb-thread))
@@ -368,23 +383,174 @@ connect to.  `connection-security' determines which port number is found.
 (defmethod ctcp-reply ((connection connection) target message)
   (send-irc-message connection :notice target (make-ctcp-message message)))
 
-#|
-There's too much wrong with this method to fix it now.
 
-(defmethod ctcp-chat-initiate ((connection connection) (nickname string))
-  #+sbcl
-  (let ((socket (sb-bsd-sockets:make-inet-socket :stream :tcp))
-        (port 44347))
-    (sb-bsd-sockets:socket-bind socket #(127 0 0 1) port) ; arbitrary port
-    (sb-bsd-sockets:socket-listen socket 1) ; accept one connection
-    (ctcp connection nickname
-          (format nil "DCC CHAT chat ~A ~A"
-                                        ; the use of hostname here is incorrect (it could be a firewall's IP)
-                  (host-byte-order (hostname (user connection))) port))
-    (make-dcc-connection :user (find-user connection nickname)
-                         :input-stream t
-                         :output-stream (sb-bsd-sockets:socket-make-stream socket :input t :output t :buffering :none)
-                         :socket socket))
-  #-sbcl (warn "ctcp-chat-initiate is not supported on this implementation.")
-  )
+;; Intermezzo: Manage outstanding offers
+
+(defvar *passive-offer-sequence-token* 0)
+
+(defgeneric dcc-add-offer (connection nickname type token &optional proto)
+  (:documentation "Adds an offer to the list off outstanding offers list
+for `connection'."))
+
+(defgeneric dcc-remove-offer (connection token)
+  ;; Tokens are uniquely defined within the scope of the library,
+  ;; so we don't need anything but the token to actually remove an offer
+  (:documentation "Remove an offer from the list of outstanding offers
+for `connection'."))
+
+(defgeneric dcc-get-offer (connection token))
+(defgeneric dcc-get-offers (connection nickname &key type token))
+
+(defun matches-offer-by-token-p (offer token)
+  (equal (third offer) token))
+
+(defun matches-offer-by-user-p (offer user)
+  (equal (first offer) user))
+
+(defun offer-matches-message-p (offer message-nick message-type message-token)
+  (and (equal (first offer) message-nick)
+       (equal (second offer) message-type)
+       (equal (third offer) message-token)))
+
+(defmethod dcc-add-offer (connection nickname type token &optional proto)
+  (push (list nickname type token) (dcc-offers connection)))
+
+(defmethod dcc-remove-offer (connection token)
+  (setf (dcc-offers connection)
+        (remove-if #'(lambda (x)
+                       (matches-offer-by-token-p x token))
+                   (dcc-offers connection))))
+
+(defmethod dcc-get-offer (connection token)
+  (let ((offer-list (remove-if #'(lambda (x)
+                                   (not (equal (third x) token)))
+                               (dcc-offers connection))))
+    (first offer-list)))
+
+(defmethod dcc-get-offers (connection nickname &key type token)
+  (let* ((results (remove-if #'(lambda (x)
+                                 (not (matches-offer-by-user-p x nickname)))
+                             (dcc-offers connection)))
+         (results (if type
+                      (remove-if #'(lambda (x)
+                                     (not (equal type (second x)))) results)
+                    results))
+         (results (if token
+                      (remove-if #'(lambda (x)
+                                     (not (equal token (third x)))) results))))
+    results))
+
+;; End of intermezzo
+
+;;
+;; And we move on with the definitions required to manage the protocol
+;;
+
+(defmethod ctcp-chat-initiate ((connection connection) (nickname string)
+                               &key passive)
+  (if passive
+      ;; do passive request
+      (let ((token (princ-to-string (incf *passive-offer-sequence-token*))))
+        ;; tokens have been specified to be integer values,
+        (dcc-add-offer connection nickname "CHAT" token)
+        (ctcp connection nickname
+              (format nil "DCC CHAT CHAT ~A 0 ~A"
+                      (usocket:host-byte-order #(1 1 1 1))
+                      token))
+        token)
+    ;; or do active request
+    (error "Active DCC initiating not (yet) supported.")))
+
+(defmethod dcc-request-cancel (connection token)
+  (dcc-remove-offer connection token)
+  (if (stringp token)
+      (let ((offer (dcc-offer-get connection token)))
+        ;; We have a passive request; active ones have an associated
+        ;; socket instead...
+        (ctcp-reply connection (first offer)
+                    (format nil "DCC REJECT ~A ~A" (second offer) token)))
+    (progn
+      ;; do something to close the socket here...
+      ;; OTOH, we don't support active sockets (yet), so, comment out.
+#|
+      (usocket:socket-close token)
+      (ctcp-reply connection nickname (format nil
+      "ERRMSG DCC ~A timed out" type))
 |#
+      )))
+
+(defmethod dcc-request-accept ((message ctcp-dcc-chat-request-message))
+  ;; There are 2 options here: it was an active dcc offer or a passive one
+  ;; For now, we'll support only active offers (where we act as a client)
+  (let* ((raw-offer (car (last (arguments message))))
+         (clean-offer (string-trim (list +soh+) raw-offer))
+         (args (tokenize-string clean-offer))
+         (remote-ip (ignore-errors (parse-integer (fourth args))))
+         (remote-port (ignore-errors (parse-integer (fifth args))))
+         (their-token (sixth args))
+         (irc-connection (connection message)))
+    (when (string= (string-upcase (third args)) "CHAT")
+      (if (= remote-port 0)
+          ;; a passive chat request, which we don't support (yet):
+          ;; we don't act as a server yet
+          (ctcp-reply irc-connection (source message)
+                      "ERRMSG DCC CHAT passive-CHAT unavailable")
+        (progn
+          (when their-token
+            (let ((offer (dcc-get-offer irc-connection their-token)))
+              (when (or (null offer)
+                        (not (offer-matches-message-p offer
+                                                      (source message)
+                                                      "CHAT" their-token)))
+                (ctcp-reply irc-connection (source message)
+                            (format nil
+                                    "ERRMSG DCC CHAT invalid token (~A)"
+                                    their-token))
+                (return-from dcc-request-accept))))
+          ;; ok, so either there was no token, or it matches
+          ;;
+          ;; When there was no token, but there was a chat request
+          ;; with the same nick and type, maybe we achieved the same
+          ;; in the end. (This would be caused by the other side
+          ;; initiating the request manually after the client blocked
+          ;; and automatic response.
+          (let ((offers (dcc-get-offers irc-connection (source message)
+                                        :type "CHAT")))
+            (when offers
+              ;; if there are more offers, consider the first fulfilled.
+              (dcc-remove-offer irc-connection (third (first offers)))))
+
+          (let ((socket (unless (or (null remote-ip)
+                                    (null remote-port)
+                                    (= 0 remote-port))
+                   (usocket:socket-connect
+                    remote-ip remote-port
+                    :element-type 'flexi-streams:octet))))
+            (dcc-remove-offer irc-connection their-token)
+            (make-dcc-chat-connection
+             :irc-connection irc-connection
+             :remote-user (find-user irc-connection (source message))
+             :socket socket
+             :network-stream (usocket:socket-stream socket))))))))
+
+(defmethod dcc-request-reject ((message ctcp-dcc-chat-request-message)
+                               &optional reason)
+  (ctcp-reply (connection message) (source message)
+              (format nil "ERRMSG DCC CHAT ~A" (if reason reason
+                                                 "rejected"))))
+
+;;
+;; IRC commands which make some sence in a DCC CHAT context
+;;
+
+(defmethod quit ((connection dcc-chat-connection)
+                 &optional message)
+  (when message
+    (ignore-errors (send-dcc-message connection message)))
+  (ignore-errors
+    (dcc-close connection)))
+
+;;## TODO
+;; ctcp action, time, source, finger, ping+pong message generation
+;; btw: those could be defined for 'normal' IRC too; currently
+;; we only generate the responses to others' messages.

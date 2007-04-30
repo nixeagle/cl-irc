@@ -124,6 +124,7 @@ user class.")))
     :initform *default-irc-server-port*)
    (socket
     :initarg :socket
+    :reader socket
     :documentation "Slot to store socket (for internal use only).")
    (network-stream
     :initarg :network-stream
@@ -144,6 +145,11 @@ see http://www.irc.org/tech_docs/draft-brocklesby-irc-isupport-03.txt")
     :initform t
     :documentation "Messages coming back from the server are sent to
 this stream.")
+   (dcc-offers
+    :accessor dcc-offers
+    :initform '()
+    :documentation "The DCC offers sent out in association with this
+connection.")
    (dcc-connections
     :accessor dcc-connections
     :initform '()
@@ -496,6 +502,14 @@ share a number of properties though."))
 (defmethod send-dcc-message ((connection dcc-connection) message)
   (format (output-stream connection) "~A~%" message)
   (force-output (network-stream connection)))
+
+(defmethod initialize-instance :after ((instance dcc-connection)
+                                       &rest initargs
+                                       &key &allow-other-keys)
+  (push instance *dcc-connections*)
+  (when (irc-connection instance)
+    (push instance (dcc-connections (irc-connection instance)))))
+
 
 (defmethod dcc-close ((connection dcc-connection))
   #+(and sbcl (not sb-thread))
@@ -1186,4 +1200,3 @@ Returns non-nil if any of the hooks do."
             (butlast (arguments message))
             (car (last (arguments message))))
     (force-output stream)))
-

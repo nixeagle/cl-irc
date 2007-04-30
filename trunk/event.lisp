@@ -329,6 +329,7 @@ objects in sync."))
               (remove-channel user channel)
             (remove-user channel user)))))))
 
+;;###TODO: generate these responses in a DCC CHAT context too.
 (macrolet ((define-ctcp-reply-hook ((message-var message-type) &body body)
                `(defmethod default-hook ((,message-var ,message-type))
                   (when (ctcp-request-p ,message-var)
