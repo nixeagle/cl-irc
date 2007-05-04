@@ -228,6 +228,10 @@ registered."
 (defmethod privmsg ((connection connection) (channel channel) (message string))
   (privmsg connection (name channel) message))
 
+(defmethod privmsg ((connection dcc-chat-connection) target message)
+  (declare (ignore target))
+  (send-dcc-message connection message))
+
 (defmethod notice ((connection connection) (target string) (message string))
   (send-irc-message connection :notice target message))
 
