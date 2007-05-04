@@ -387,7 +387,6 @@ connect to.  `connection-security' determines which port number is found.
 (defmethod ctcp-reply ((connection connection) target message)
   (send-irc-message connection :notice target (make-ctcp-message message)))
 
-
 ;; Intermezzo: Manage outstanding offers
 
 (defvar *passive-offer-sequence-token* 0)
@@ -465,7 +464,12 @@ for `connection'."))
     ;; or do active request
     (error "Active DCC initiating not (yet) supported.")))
 
-(defmethod dcc-request-cancel (connection token)
+(defmethod ctcp-chat-initiate ((connection dcc-chat-connection)
+                               nickname &key passive)
+  (declare (ignore nickname passive))
+  (error "Chat connection already in progress"))
+
+(defmethod dcc-request-cancel ((connection connection) token)
   (dcc-remove-offer connection token)
   (if (stringp token)
       (let ((offer (dcc-offer-get connection token)))
@@ -482,6 +486,9 @@ for `connection'."))
       "ERRMSG DCC ~A timed out" type))
 |#
       )))
+
+(defmethod dcc-request-cancel ((connection dcc-chat-connection) token)
+  (dcc-request-cancel (irc-connection connection) token))
 
 (defmethod dcc-request-accept ((message ctcp-dcc-chat-request-message))
   ;; There are 2 options here: it was an active dcc offer or a passive one
@@ -537,9 +544,19 @@ for `connection'."))
              :socket socket
              :network-stream (usocket:socket-stream socket))))))))
 
+(defmethod dcc-request-accept ((message dcc-ctcp-dcc-chat-request-message))
+  (error "DCC Chat already in progress"))
+
 (defmethod dcc-request-reject ((message ctcp-dcc-chat-request-message)
                                &optional reason)
   (ctcp-reply (connection message) (source message)
+              (format nil "ERRMSG DCC CHAT ~A" (if reason reason
+                                                 "rejected"))))
+
+(defmethod dcc-request-reject ((message dcc-ctcp-dcc-chat-request-message)
+                               &optional reason)
+  (ctcp-reply (irc-connection (connection message))
+              (nickname (user (connection message)))
               (format nil "ERRMSG DCC CHAT ~A" (if reason reason
                                                  "rejected"))))
 
