@@ -1086,7 +1086,7 @@ Returns non-nil if any of the hooks do."
    (raw-message-string
     :initarg :raw-message-string
     :accessor raw-message-string
-    :type sting))
+    :type string))
   (:documentation ""))
 
 (defmethod print-object ((object dcc-message) stream)

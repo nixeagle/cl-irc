@@ -474,7 +474,7 @@ for `connection'."))
 (defmethod dcc-request-cancel ((connection connection) token)
   (dcc-remove-offer connection token)
   (if (stringp token)
-      (let ((offer (dcc-offer-get connection token)))
+      (let ((offer (dcc-get-offer connection token)))
         ;; We have a passive request; active ones have an associated
         ;; socket instead...
         (ctcp-reply connection (first offer)
