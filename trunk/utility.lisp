@@ -119,7 +119,7 @@ parse-integer) on each of the string elements."
                                ;; :element-type 'character
                                :external-format ex-fmt)))
                   (read-line flexi nil nil)))
-              (flexi-streams:flexi-stream-encoding-error ()
+              (flexi-streams:external-format-encoding-error ()
                   nil)))
         if decoded
         do (return decoded)))
