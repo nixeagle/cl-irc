@@ -723,7 +723,7 @@
 
 
 (defun valid-cliki-message (message)
-  (scan *cliki-attention-prefix* (trailing-argument message)))
+  (scan *cliki-attention-prefix* (car (last (arguments message)))))
 
 (defvar *respond-to-general-hellos* nil)
 
@@ -741,15 +741,15 @@
 		 (nthcdr 10 (sb-debug:backtrace-as-list)))
 	 (return-from msg-hook))))
     (progn
-      (scan-for-more (trailing-argument message))
+      (scan-for-more (car (last (arguments message))))
       (let ((respond-to (if (string-equal (first (arguments message)) *cliki-nickname*) (source message) (first (arguments message)))))
 	(if (valid-cliki-message message)
-	    (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (trailing-argument message) "") :sender (source message) :channel (first (irc:arguments message)))))
+	    (let ((response (cliki-lookup (regex-replace *cliki-attention-prefix* (car (last (arguments message))) "") :sender (source message) :channel (first (irc:arguments message)))))
 	      (and response (privmsg *cliki-connection* respond-to response)))
 	    (if (string-equal (first (arguments message)) *cliki-nickname*)
-		(aif (cliki-lookup (trailing-argument message) :sender (source message))
+		(aif (cliki-lookup (car (last (arguments message))) :sender (source message))
 		     (privmsg *cliki-connection* respond-to it))
-		(if (anybody-here (trailing-argument message))
+		(if (anybody-here (car (last (arguments message))))
 		    (privmsg *cliki-connection* (first (arguments message)) (format nil "~A: hello." (source message))))))
 	(take-care-of-memos respond-to (source message))))))
 
@@ -757,7 +757,7 @@
 
 (defun notice-hook (message)
   (if (and (string-equal (source message) "NickServ")
-	   (scan "owned by someone else" (trailing-argument message)))
+	   (scan "owned by someone else" (car (last (arguments message)))))
       (privmsg *cliki-connection* (source message) (format nil "IDENTIFY ~A" *cliki-nickserv-password*))))
 
 (defun rename-cliki (new-nick)
