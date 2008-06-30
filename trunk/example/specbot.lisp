@@ -105,10 +105,10 @@
   (let ((destination (if (string-equal (first (arguments message)) *nickname*)
                          (source message)
                          (first (arguments message))))
-        (to-lookup (strip-address (trailing-argument message))))
+        (to-lookup (strip-address (car (last (arguments message))))))
     (if (and (or
               (string-equal (first (arguments message)) *nickname*)
-              (not (string= to-lookup (trailing-argument message))))
+              (not (string= to-lookup (car (last (arguments message))))))
              (member to-lookup '("help" "help?") :test #'string-equal))
         (progn
           (privmsg *connection* destination
