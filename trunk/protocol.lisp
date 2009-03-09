@@ -311,7 +311,14 @@ is up for removal in a next release.")
   (flet ((select-handler (fd)
             (declare (ignore fd))
             (if (listen (network-stream connection))
-                (read-message connection)
+                (handler-bind
+                    ;; install sensible recovery: nobody can wrap the
+                    ;; handler...
+                    ((no-such-reply
+                      #'(lambda (c)
+                          (declare (ignore c))
+                          (invoke-restart 'continue))))
+                  (read-message connection))
               ;; select() returns with no
               ;; available data if the stream
               ;; has been closed on the other
@@ -324,7 +331,14 @@ is up for removal in a next release.")
                            :input #'select-handler))
 
   #-(and sbcl (not sb-thread))
-  (flet ((do-loop () (read-message-loop connection)))
+  (flet ((do-loop ()
+           (loop
+              (handler-bind
+                  ((no-such-reply
+                    #'(lambda (c)
+                        (declare (ignore c))
+                        (invoke-restart 'continue))))
+                (read-message-loop connection)))))
     (let ((name (format nil "irc-hander-~D" (incf *process-count*))))
       (start-process #'do-loop name))))
 
